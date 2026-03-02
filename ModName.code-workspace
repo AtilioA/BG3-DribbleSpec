@@ -1,0 +1,44 @@
+{
+    "folders": [
+        {
+            "path": ".",
+            "name": "ModName"
+        },
+        {
+            "path": "C:\\Modding\\BG3\\ReferenceScripts",
+            "name": "ReferenceScripts"
+        },
+        {
+            "path": "C:\\Users\\AAD\\Git\\BG3-VolitionCabinet\\VolitionCabinet\\Mods\\VolitionCabinet\\ScriptExtender\\Lua",
+            "name": "VolitionCabinet"
+        },
+        {
+            "path": "C:\\Users\\AAD\\Git\\BG3-MCM\\Mod Configuration Menu\\Mods\\BG3MCM\\ScriptExtender\\Lua",
+            "name": "BG3MCM"
+        }
+    ],
+    "settings": {
+        "search.exclude": {
+            "**/*.raw": true,
+            "**/Story/*.div": true,
+            "**/*.osi": true,
+            "**/*.dat": true
+        },
+        "Lua.workspace.library": [
+            "C:\\Modding\\BG3\\ReferenceScripts",
+            "C:\\Users\\AAD\\Git\\BG3-VolitionCabinet\\VolitionCabinet\\Mods\\VolitionCabinet\\ScriptExtender\\Lua",
+            "C:\\Users\\AAD\\Git\\BG3-MCM\\Mod Configuration Menu\\Mods\\BG3MCM\\ScriptExtender\\Lua"
+        ],
+        "Lua.diagnostics.libraryFiles": "Disable",
+        "Lua.diagnostics.workspaceRate": 33,
+        "Lua.diagnostics.workspaceDelay": 5000,
+        "Lua.workspace.preloadFileSize": 5000,
+        "Lua.diagnostics.globals": [
+            "Osi",
+            "Ext"
+        ],
+        "bg3ModHelper.rootModPath": "c:\\Users\\AAD\\Git\\BG3-mod",
+        "bg3ModHelper.packingPriority": 0,
+        "bg3ModHelper.modName": "ModName"
+    }
+}
