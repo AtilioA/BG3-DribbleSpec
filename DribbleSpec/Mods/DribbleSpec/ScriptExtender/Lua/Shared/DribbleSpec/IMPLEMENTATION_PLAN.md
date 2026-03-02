@@ -1,0 +1,231 @@
+# DribbleSpec Implementation Plan
+
+This roadmap implements `SPEC.md` with JSON reporting as the final phase.
+
+## Locked Decisions
+
+- Command name: `dribble`.
+- Caller mod display name source: `Ext.Mod.GetMod(<moduleUUID>).Info.Name`.
+- Explicit include manifest name: `DribbleTests.lua`.
+- Framework style: greenfield, standalone, mod-agnostic.
+- Development style: no automated tests in Phase 0; strict TDD + dogfooding starts in Phase 1.
+- JSON reporter: lowest priority.
+
+## Multi-Phase Delivery Plan
+
+### Phase 0 - Scaffold and Contracts (No Automated Tests)
+
+Goal:
+- Build the skeleton and freeze internal boundaries before feature work.
+
+Scope:
+- Create DribbleSpec folder/module scaffold.
+- Implement internal contracts for registry, runner, result model, options parsing, sandbox placeholder.
+- Implement command plumbing (`dribble`) and manual smoke run flow.
+- Implement explicit manifest loading contract (`DribbleTests.lua`).
+- Add docs updates and Context7 reference guidance.
+
+Validation approach:
+- Manual smoke checks only (no test harness yet).
+
+Exit criteria:
+- `Ext.Require("Lib/DribbleSpec/init.lua")` loads.
+- `dribble` command executes and returns deterministic empty summary when no tests are registered.
+- `dribble --help` prints usable options.
+
+### Phase 1 - Minimal Runnable Framework (Start TDD Here)
+
+Goal:
+- Dribble can run its own tests.
+
+Scope:
+- Implement DSL registration basics: `describe`, `test`, `it`, `test.skip`, `test.only`.
+- Implement hooks: `beforeAll`, `beforeEach`, `afterEach`, `afterAll`.
+- Implement deterministic registration order.
+- Create Dribble self-tests and run them through Dribble (dogfooding starts).
+
+Exit criteria:
+- Dribble self-tests can be loaded from explicit manifest and executed by `dribble`.
+
+### Phase 2 - Runner and Filtering
+
+Goal:
+- Reliable test execution controls.
+
+Scope:
+- Full runner lifecycle and status handling (`passed|failed|skipped`).
+- Filtering: `--name`, `--tag` (repeatable), `--context`.
+- Run control: `--fail-fast`.
+
+Exit criteria:
+- Filter and control behavior covered by Dribble self-tests.
+
+### Phase 3 - Expect Core
+
+Goal:
+- Usable assertion API.
+
+Scope:
+- Core matchers and throw matchers from spec.
+- Deterministic deep equality and stable diffs.
+
+Exit criteria:
+- Assertion behavior and error messages covered by self-tests.
+
+### Phase 4 - Doubles and Isolation
+
+Goal:
+- Robust stubs/spies/mocks with automatic restoration.
+
+Scope:
+- `ctx.spyOn`, `ctx.stub`, `ctx.mockFn`.
+- Call assertions (`toHaveBeenCalled*`).
+- Leak prevention across test boundaries.
+
+Exit criteria:
+- Isolation guarantees covered by self-tests.
+
+### Phase 5 - Runtime Helpers
+
+Goal:
+- Runtime-aware tests in client/server contexts.
+
+Scope:
+- `ctx.requireClient`, `ctx.requireServer` with skip semantics.
+- `ctx.nextTick`, `ctx.waitUntil` with timeout behavior.
+
+Exit criteria:
+- Context mismatch -> skipped (not failed), covered by self-tests.
+
+### Phase 6 - Fixtures Framework
+
+Goal:
+- Repeatable setup/teardown for mod tests.
+
+Scope:
+- Fixture manager + provider contract.
+- Provider order: pre-placed first, spawn fallback second.
+- `ctx.fixture.character/item/entity`, `ctx.fixture.state.snapshot/restore`.
+
+Exit criteria:
+- Cleanup and restoration behavior covered by self-tests.
+
+### Phase 7 - Entity/ECS Domain Layer
+
+Goal:
+- Reduce flakiness for entity-heavy suites.
+
+Scope:
+- `EntityRef` abstraction with lazy re-resolution.
+- Domain matchers: `toBeGuid`, `toBeEntity`, `toHaveComponent`.
+- Volatile-field filter presets.
+
+Exit criteria:
+- Entity lifecycle and stale-handle resilience covered by self-tests.
+
+### Phase 8 - Consumer UX and Adoption Docs
+
+Goal:
+- Easy adoption by external mods.
+
+Scope:
+- Integration docs using explicit `DribbleTests.lua` include model.
+- Example suites for unit/runtime/entity modes.
+- Packaging guidance for dependency mods.
+
+Exit criteria:
+- Clean start-to-finish integration walkthrough exists.
+
+### Phase 9 - JSON Reporter (Lowest Priority)
+
+Goal:
+- CI artifact output.
+
+Scope:
+- JSON schema output from `SPEC.md`.
+- Caller name resolution from `moduleUUID -> Info.Name`.
+- Default output path:
+  - `DribbleSpec/<caller_modname>/results_<file-safe_ISO8601_timestamp>.json`
+- `--json-out` override.
+
+Exit criteria:
+- Reporter output and failure behavior covered by self-tests.
+
+## Phase 0 Deep Dive
+
+## A) Internal Contracts to Freeze
+
+### Result Model Contract
+- Run summary fields always present.
+- Suite/test result containers always present.
+- Status vocabulary fixed: `passed|failed|skipped` for tests; run-level derived from summary.
+
+### Registry Contract
+- Deterministic insertion order index.
+- Suite/test nodes carry metadata bag even before full DSL implementation.
+
+### Runner Contract
+- Input: registry snapshot + normalized options.
+- Output: deterministic run result object.
+- Must not mutate declaration metadata.
+
+### Options Contract
+- Parse console args into normalized options table.
+- Unknown args preserved for diagnostics.
+
+### Command Contract
+- `dribble` calls parse -> manifest load -> run.
+- Help path exits without running.
+
+## B) Phase 0 Build Tasks
+
+1. Scaffold module tree:
+- `init.lua`
+- `Core/Registry.lua`
+- `Core/ResultModel.lua`
+- `Runner/Runner.lua`
+- `Runner/Options.lua`
+- `Internal/Clock.lua`
+- `Internal/Sandbox.lua`
+- `Internal/CallerMod.lua`
+- `Internal/ManifestLoader.lua`
+
+2. Implement minimal wiring:
+- init module creates singleton registry instance.
+- run path can execute empty registry and return stable result.
+
+3. Implement command plumbing:
+- register `dribble` once.
+- parse and print help/options/summary.
+
+4. Implement explicit include-manifest behavior:
+- default manifest `DribbleTests.lua`.
+- safe loading with warning on missing manifest.
+
+5. Documentation updates:
+- keep `SPEC.md` and this plan aligned.
+- include Context7 lookup reminder in spec.
+
+## C) Phase 0 Manual Smoke Checklist
+
+- Load check: require DribbleSpec init module.
+- Help check: run `dribble --help`.
+- Empty run check: run `dribble` with no manifest present and verify deterministic zero-summary output.
+- Manifest check: run `dribble --manifest <path>` with a valid file and verify load path is used.
+
+## D) Risks and Mitigations
+
+- Risk: early API churn.
+  - Mitigation: freeze internal contracts now, public features later.
+- Risk: command double-registration during reload.
+  - Mitigation: global guard around console command registration.
+- Risk: hidden assumptions about BG3SE APIs.
+  - Mitigation: use Context7 lookup when uncertain and document constraints.
+
+## E) Immediate Next Step
+
+Execute Phase 0 scaffold implementation now, then run manual smoke checks.
+
+## Unresolved Questions
+
+- None.
