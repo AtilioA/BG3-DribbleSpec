@@ -29,7 +29,7 @@ Validation approach:
 - Manual smoke checks only (no test harness yet).
 
 Exit criteria:
-- `Ext.Require("Lib/DribbleSpec/init.lua")` loads.
+- `Ext.Require("Shared/DribbleSpec/init.lua")` loads.
 - `dribble` command executes and returns deterministic empty summary when no tests are registered.
 - `dribble --help` prints usable options.
 
@@ -150,6 +150,58 @@ Scope:
 
 Exit criteria:
 - Reporter output and failure behavior covered by self-tests.
+
+## Phase 1 Deep Dive (TDD Starts)
+
+### A) Phase 1 Objective
+
+- DribbleSpec can register and execute tests through public APIs.
+- DribbleSpec self-tests run via `dribble` from explicit `DribbleTests.lua` includes.
+- Development follows strict vertical TDD slices (no horizontal test batching).
+
+### B) Public Behavior Contract for Phase 1
+
+- API available: `describe`, `test`, `it`, `test.skip`, `test.only`, `beforeAll`, `beforeEach`, `afterEach`, `afterAll`.
+- `beforeAll` failure policy: skip remaining tests in that suite.
+- `afterEach` failure policy: fail current test only.
+- Execution order is deterministic by declaration order.
+
+### C) Vertical Slice Plan (No Horizontal Slicing)
+
+1. Slice P1.1: single `describe` + single `test` executes and reports pass.
+2. Slice P1.2: failing test reports fail message and stack.
+3. Slice P1.3: `it` alias parity with `test`.
+4. Slice P1.4: `test.skip` reports skipped without executing body.
+5. Slice P1.5: `test.only` focus behavior (global only-mode).
+6. Slice P1.6: `beforeEach` and `afterEach` run around each test in order.
+7. Slice P1.7: `beforeAll` and `afterAll` run once per suite.
+8. Slice P1.8: `beforeAll` failure skips remaining suite tests.
+9. Slice P1.9: `afterEach` failure marks only current test failed.
+10. Slice P1.10: nested `describe` order and full name composition.
+
+Each slice rule:
+- RED: write one behavior test through public API.
+- GREEN: minimal implementation for that behavior only.
+- REFACTOR: only while green.
+
+### D) Dogfooding Setup
+
+- Self-tests live under `Shared/DribbleSpec/Tests/`.
+- Explicit include manifest remains `Lua/DribbleTests.lua`.
+- `DribbleTests.lua` loads self-test files with `Ext.Require`.
+
+### E) Runtime and Tooling Notes
+
+- DribbleSpec core remains under `Shared/DribbleSpec/`.
+- Client/server-only behavior is gated with `Ext.IsClient()`/`Ext.IsServer()`.
+- Use `bg3se-console-ops` for console-driven iteration and log inspection during Phase 1.
+
+### F) Phase 1 Exit Criteria
+
+- `dribble` runs self-tests and reports correct pass/fail/skip totals.
+- Hook failure policies are implemented exactly as locked.
+- Deterministic ordering is proven by self-tests.
+- No tests rely on internal modules or private state.
 
 ## Phase 0 Deep Dive
 

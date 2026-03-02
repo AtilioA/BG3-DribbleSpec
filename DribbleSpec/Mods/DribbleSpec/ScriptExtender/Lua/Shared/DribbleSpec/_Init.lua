@@ -1,1 +1,1 @@
-return Ext.Require("Lib/DribbleSpec/init.lua")
+return Ext.Require("Shared/DribbleSpec/init.lua")

@@ -37,4 +37,5 @@ end
 
 RequireFiles("Shared/", {
     "Helpers/_Init",
+    "DribbleSpec/_Init",
 })

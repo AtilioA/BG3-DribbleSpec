@@ -1,11 +1,11 @@
-local Registry = Ext.Require("Lib/DribbleSpec/Core/Registry.lua")
-local ResultModel = Ext.Require("Lib/DribbleSpec/Core/ResultModel.lua")
-local Runner = Ext.Require("Lib/DribbleSpec/Runner/Runner.lua")
-local Options = Ext.Require("Lib/DribbleSpec/Runner/Options.lua")
-local Clock = Ext.Require("Lib/DribbleSpec/Internal/Clock.lua")
-local Sandbox = Ext.Require("Lib/DribbleSpec/Internal/Sandbox.lua")
-local CallerMod = Ext.Require("Lib/DribbleSpec/Internal/CallerMod.lua")
-local ManifestLoader = Ext.Require("Lib/DribbleSpec/Internal/ManifestLoader.lua")
+local Registry = Ext.Require("Shared/DribbleSpec/Core/Registry.lua")
+local ResultModel = Ext.Require("Shared/DribbleSpec/Core/ResultModel.lua")
+local Runner = Ext.Require("Shared/DribbleSpec/Runner/Runner.lua")
+local Options = Ext.Require("Shared/DribbleSpec/Runner/Options.lua")
+local Clock = Ext.Require("Shared/DribbleSpec/Internal/Clock.lua")
+local Sandbox = Ext.Require("Shared/DribbleSpec/Internal/Sandbox.lua")
+local CallerMod = Ext.Require("Shared/DribbleSpec/Internal/CallerMod.lua")
+local ManifestLoader = Ext.Require("Shared/DribbleSpec/Internal/ManifestLoader.lua")
 
 ---@class DribbleSpecAPI
 ---@field _VERSION string

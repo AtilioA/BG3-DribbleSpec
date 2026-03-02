@@ -31,7 +31,13 @@ Common tags for filtering:
 ## 3) Package and Layout
 
 Location in this repo:
-- `Mod Configuration Menu/Mods/BG3MCM/ScriptExtender/Lua/Lib/DribbleSpec/`
+- `DribbleSpec/Mods/DribbleSpec/ScriptExtender/Lua/Shared/DribbleSpec/`
+
+Runtime layout rules:
+- `Shared/` code runs on both client and server.
+- `Client/` is client-only.
+- `Server/` is server-only.
+- DribbleSpec core lives in `Shared/DribbleSpec/` and gates context-specific behavior with `Ext.IsClient()`/`Ext.IsServer()`.
 
 Proposed internal structure:
 - `init.lua` - public API export.
@@ -180,6 +186,8 @@ Runner behavior:
 - per-test timing;
 - continue-on-failure by default;
 - optional fail-fast mode.
+- if `beforeAll` fails for a suite, remaining tests in that suite are marked `skipped` with setup-failure reason.
+- if `afterEach` fails, only the current test is marked `failed` (or remains failed); later tests continue unless fail-fast is enabled.
 
 ### 7.2 Filtering
 
@@ -190,7 +198,7 @@ Required filters:
 
 ### 7.3 Console Entry
 
-Framework-owned command namespace (final name TBD during implementation), for example:
+Framework-owned command namespace:
 - `dribble`
 
 Expected options:
@@ -255,7 +263,7 @@ DribbleSpec must remain mod-agnostic:
 ## 10) Example Consumer Usage
 
 ```lua
-local Dribble = Ext.Require("Lib/DribbleSpec/init.lua")
+local Dribble = Ext.Require("Shared/DribbleSpec/init.lua")
 
 Dribble.describe("Settings migration", { tags = { "runtime", "client" } }, function()
     Dribble.beforeEach(function(ctx)

@@ -1,4 +1,4 @@
-local ResultModel = Ext.Require("Lib/DribbleSpec/Core/ResultModel.lua")
+local ResultModel = Ext.Require("Shared/DribbleSpec/Core/ResultModel.lua")
 
 local Runner = {}
 

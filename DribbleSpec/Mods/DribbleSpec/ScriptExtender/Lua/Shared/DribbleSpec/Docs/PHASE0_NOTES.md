@@ -5,7 +5,7 @@ Phase 0 intentionally does not include an automated test harness.
 ## Manual Smoke Checks
 
 1. Load the framework module:
-   - `Ext.Require("Lib/DribbleSpec/init.lua")`
+   - `Ext.Require("Shared/DribbleSpec/init.lua")`
 2. Confirm command help:
    - `dribble --help`
 3. Confirm empty run path:
