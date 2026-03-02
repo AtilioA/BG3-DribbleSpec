@@ -203,6 +203,11 @@ Each slice rule:
 - Deterministic ordering is proven by self-tests.
 - No tests rely on internal modules or private state.
 
+Status (2026-03-02):
+- Functional behavior slices are implemented and covered through dogfood tests.
+- Client runtime pass observed with totals `passed=9 failed=0 skipped=1 total=10`.
+- Final verification step pending: successful server-context runtime execution in current BG3 session.
+
 ## Phase 0 Deep Dive
 
 ## A) Internal Contracts to Freeze
