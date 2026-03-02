@@ -6,12 +6,12 @@ function SubscribedEvents:SubscribeToEvents()
             if MCM.Get("mod_enabled") then
                 handler(...)
             else
-                MNPrint(1, "Event handling is disabled.")
+                DSPrint(1, "Event handling is disabled.")
             end
         end
     end
 
-    MNDebug(2, "Subscribing to events with JSON config: " ..
+    DSDebug(2, "Subscribing to events with JSON config: " ..
         Ext.Json.Stringify(Mods.BG3MCM.MCMAPI:GetAllModSettings(ModuleUUID)))
 
 
@@ -27,7 +27,7 @@ function SubscribedEvents:SubscribeToEvents()
 
     Ext.Osiris.RegisterListener("InstanceDialogChanged", 4, "after",
         conditionalWrapper(function(oldDialog, oldDialogStopping, instanceID, newDialog)
-            MNPrint(2,
+            DSPrint(2,
                 "InstanceDialogChanged: " ..
                 oldDialog .. " " .. oldDialogStopping .. " " .. instanceID .. " " .. newDialog)
         end))
