@@ -1,21 +1,54 @@
 ---@class DribbleRegistrySuite
 ---@field id integer
 ---@field name string
+---@field fullName string
 ---@field metadata table
 ---@field hooks table
 ---@field tests table
+---@field suites DribbleRegistrySuite[]
+---@field parent DribbleRegistrySuite|nil
+---@field only boolean
+---@field skip boolean
+
+---@class DribbleRegistryTest
+---@field id integer
+---@field name string
+---@field fullName string
+---@field metadata table
+---@field callback function
+---@field only boolean
+---@field skip boolean
 
 ---@class DribbleRegistry
 ---@field private _nextOrder integer
----@field private _suites DribbleRegistrySuite[]
+---@field private _rootSuites DribbleRegistrySuite[]
+---@field private _suiteStack DribbleRegistrySuite[]
+---@field private _hasOnly boolean
 local Registry = {}
 Registry.__index = Registry
+
+---@param metadata table|nil
+---@return table
+local function normalizeMetadata(metadata)
+    local normalized = metadata or {}
+    if type(normalized) ~= "table" then
+        normalized = {}
+    end
+
+    if type(normalized.tags) ~= "table" then
+        normalized.tags = {}
+    end
+
+    return normalized
+end
 
 ---@return DribbleRegistry
 function Registry.Create()
     return setmetatable({
         _nextOrder = 1,
-        _suites = {},
+        _rootSuites = {},
+        _suiteStack = {},
+        _hasOnly = false,
     }, Registry)
 end
 
@@ -26,14 +59,31 @@ function Registry:NextOrder()
     return current
 end
 
+---@return DribbleRegistrySuite|nil
+function Registry:CurrentSuite()
+    return self._suiteStack[#self._suiteStack]
+end
+
 ---@param name string
 ---@param metadata table|nil
 ---@return DribbleRegistrySuite
-function Registry:AddSuite(name, metadata)
+function Registry:BeginSuite(name, metadata)
+    if type(name) ~= "string" or name == "" then
+        error("describe() requires a non-empty suite name", 2)
+    end
+
+    local normalizedMetadata = normalizeMetadata(metadata)
+    local parent = self:CurrentSuite()
+    local fullName = name
+    if parent then
+        fullName = string.format("%s %s", parent.fullName, name)
+    end
+
     local suite = {
         id = self:NextOrder(),
-        name = name or ("Suite_" .. tostring(self._nextOrder)),
-        metadata = metadata or {},
+        name = name,
+        fullName = fullName,
+        metadata = normalizedMetadata,
         hooks = {
             beforeAll = {},
             beforeEach = {},
@@ -41,33 +91,128 @@ function Registry:AddSuite(name, metadata)
             afterAll = {},
         },
         tests = {},
+        suites = {},
+        parent = parent,
+        only = normalizedMetadata.only == true,
+        skip = normalizedMetadata.skip == true,
     }
 
-    table.insert(self._suites, suite)
+    if parent then
+        table.insert(parent.suites, suite)
+    else
+        table.insert(self._rootSuites, suite)
+    end
+
+    table.insert(self._suiteStack, suite)
+    if suite.only then
+        self._hasOnly = true
+    end
+
     return suite
+end
+
+---@return DribbleRegistrySuite
+function Registry:EndSuite()
+    local suite = table.remove(self._suiteStack)
+    if not suite then
+        error("describe() scope mismatch: no suite to end", 2)
+    end
+
+    return suite
+end
+
+---@param hookName "beforeAll"|"beforeEach"|"afterEach"|"afterAll"
+---@param callback function
+---@return table
+function Registry:AddHook(hookName, callback)
+    local suite = self:CurrentSuite()
+    if not suite then
+        error(string.format("%s() must be called inside describe()", hookName), 2)
+    end
+
+    if type(callback) ~= "function" then
+        error(string.format("%s() requires a function callback", hookName), 2)
+    end
+
+    local hooks = suite.hooks[hookName]
+    if type(hooks) ~= "table" then
+        error(string.format("Unknown hook '%s'", hookName), 2)
+    end
+
+    local hook = {
+        id = self:NextOrder(),
+        callback = callback,
+    }
+    table.insert(hooks, hook)
+    return hook
+end
+
+---@param name string
+---@param metadata table|nil
+---@param callback function
+---@return DribbleRegistryTest
+function Registry:AddTest(name, metadata, callback)
+    local suite = self:CurrentSuite()
+    if not suite then
+        error("test() must be called inside describe()", 2)
+    end
+
+    if type(name) ~= "string" or name == "" then
+        error("test() requires a non-empty test name", 2)
+    end
+
+    if type(callback) ~= "function" then
+        error("test() requires a function callback", 2)
+    end
+
+    local normalizedMetadata = normalizeMetadata(metadata)
+    local test = {
+        id = self:NextOrder(),
+        name = name,
+        fullName = string.format("%s %s", suite.fullName, name),
+        metadata = normalizedMetadata,
+        callback = callback,
+        only = normalizedMetadata.only == true,
+        skip = normalizedMetadata.skip == true,
+    }
+
+    table.insert(suite.tests, test)
+    if test.only then
+        self._hasOnly = true
+    end
+
+    return test
+end
+
+---@return boolean
+function Registry:HasOnly()
+    return self._hasOnly == true
 end
 
 ---@return table
 function Registry:Snapshot()
     local suites = {}
-    for i, suite in ipairs(self._suites) do
+    for i, suite in ipairs(self._rootSuites) do
         suites[i] = suite
     end
 
     return {
         suites = suites,
         nextOrder = self._nextOrder,
+        hasOnly = self._hasOnly,
     }
 end
 
 function Registry:Clear()
     self._nextOrder = 1
-    self._suites = {}
+    self._rootSuites = {}
+    self._suiteStack = {}
+    self._hasOnly = false
 end
 
 ---@return integer
 function Registry:SuiteCount()
-    return #self._suites
+    return #self._rootSuites
 end
 
 return Registry

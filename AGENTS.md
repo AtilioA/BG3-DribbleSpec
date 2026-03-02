@@ -85,6 +85,7 @@ Use the tdd skill to implement the TDD workflow.
 - Use `bg3se-console-ops` for iterative BG3SE console/test output workflows.
 - Do not add speculative framework features ahead of active TDD slice.
 - If uncertain about BG3SE API, use the Context7 MCP.
+- Commit and push often.
 
 ## Surprise Log Policy
 
@@ -93,3 +94,5 @@ If you hit unexpected runtime behavior, add a short “Surprise note” here wit
 - Date, what happened, trigger/context, safe workaround/solution.
 
 Keep notes concise so future agents avoid repeated failure modes.
+
+Surprise note (2026-03-02): If `Shared/DribbleSpec/init.lua` tries to preload `DribbleTests.lua` during its own module initialization, test files that `Ext.Require("Shared/DribbleSpec/init.lua")` can recurse and hit `too many C levels`. Safe workaround: set `_G.Dribble` early and have test files use `_G.Dribble or Ext.Require(...)`.

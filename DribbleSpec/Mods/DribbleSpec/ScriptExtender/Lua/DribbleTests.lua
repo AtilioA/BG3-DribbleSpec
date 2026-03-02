@@ -1,4 +1,4 @@
--- DribbleSpec explicit include manifest.
--- Phase 0/1: list DribbleSpec self-test files here.
+Ext.Require("Shared/DribbleSpec/Tests/_Init.lua")
 
 return true
+

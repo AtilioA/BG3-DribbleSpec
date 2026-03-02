@@ -12,11 +12,32 @@ local ManifestLoader = Ext.Require("Shared/DribbleSpec/Internal/ManifestLoader.l
 ---@field _PHASE integer
 ---@field _internal table
 local Dribble = {
-    _VERSION = "0.1.0-phase0",
-    _PHASE = 0,
+    _VERSION = "0.2.0-phase1",
+    _PHASE = 1,
 }
 
+_G.Dribble = Dribble
+
 local registry = Registry.Create()
+local loadedManifests = {}
+
+---@param manifestPath string
+---@param forceReload boolean|nil
+---@return boolean loaded
+---@return string|nil errorMessage
+---@return boolean attempted
+local function loadManifest(manifestPath, forceReload)
+    if forceReload ~= true and loadedManifests[manifestPath] == true then
+        return true, nil, false
+    end
+
+    local loaded, err = ManifestLoader.TryLoad(manifestPath)
+    if loaded then
+        loadedManifests[manifestPath] = true
+    end
+
+    return loaded, err, true
+end
 
 ---@param message string
 local function printLine(message)
@@ -41,7 +62,7 @@ local function printWarning(message)
 end
 
 local function printHelp()
-    printLine("DribbleSpec (Phase 0) usage:")
+    printLine("DribbleSpec (Phase 1) usage:")
     printLine("  dribble [--help] [--manifest <path>] [--name <pattern>] [--tag <tag>] [--context <client|server|any>] [--fail-fast] [--mod-uuid <uuid>] [--json-out <path>]")
     printLine("Defaults:")
     printLine("  --manifest DribbleTests.lua")
@@ -68,7 +89,7 @@ end
 ---@return table
 local function runInternal(options)
     local normalized = Options.Normalize(options or {})
-    local loaded, manifestError = ManifestLoader.TryLoad(normalized.manifestPath)
+    local loaded, manifestError, manifestAttempted = loadManifest(normalized.manifestPath, normalized.reloadManifest == true)
     local runResult = Runner.Run({
         registry = registry,
         options = normalized,
@@ -77,11 +98,12 @@ local function runInternal(options)
 
     runResult.manifest = {
         path = normalized.manifestPath,
+        attempted = manifestAttempted,
         loaded = loaded,
         error = manifestError,
     }
 
-    if not loaded then
+    if manifestAttempted and not loaded then
         ResultModel.AddWarning(runResult,
             string.format("Manifest not loaded from '%s': %s", tostring(normalized.manifestPath), tostring(manifestError)))
     end
@@ -138,7 +160,39 @@ local function registerCommand()
 end
 
 local function notAvailable(name)
-    error(string.format("DribbleSpec Phase 0: '%s' is not implemented yet.", name), 2)
+    error(string.format("DribbleSpec Phase 1: '%s' is not implemented yet.", name), 2)
+end
+
+---@param optionsOrCallback table|function|nil
+---@param maybeCallback function|nil
+---@param callsite string
+---@return table, function
+local function resolveMetadataAndCallback(optionsOrCallback, maybeCallback, callsite)
+    if type(optionsOrCallback) == "function" and maybeCallback == nil then
+        return {}, optionsOrCallback
+    end
+
+    if type(optionsOrCallback) == "table" and type(maybeCallback) == "function" then
+        return optionsOrCallback, maybeCallback
+    end
+
+    error(string.format("%s() expects (%s, callback) or (%s, options, callback)", callsite, "name", "name"), 3)
+end
+
+---@param name string
+---@param optionsOrCallback table|function|nil
+---@param maybeCallback function|nil
+---@param metadataPatch table|nil
+---@return table
+local function registerTest(name, optionsOrCallback, maybeCallback, metadataPatch)
+    local metadata, callback = resolveMetadataAndCallback(optionsOrCallback, maybeCallback, "test")
+    if metadataPatch then
+        for k, v in pairs(metadataPatch) do
+            metadata[k] = v
+        end
+    end
+
+    return registry:AddTest(name, metadata, callback)
 end
 
 Dribble.Run = runInternal
@@ -150,28 +204,78 @@ Dribble.GetRegistry = function()
     return registry
 end
 
-Dribble.describe = function(...)
-    return notAvailable("describe")
+---@param name string
+---@param optionsOrCallback table|function
+---@param maybeCallback function|nil
+function Dribble.describe(name, optionsOrCallback, maybeCallback)
+    local metadata, callback = resolveMetadataAndCallback(optionsOrCallback, maybeCallback, "describe")
+    registry:BeginSuite(name, metadata)
+
+    local ok, err = xpcall(function()
+        callback()
+    end, debug.traceback)
+
+    registry:EndSuite()
+    if not ok then
+        error(err, 0)
+    end
 end
-Dribble.test = function(...)
-    return notAvailable("test")
+
+---@param name string
+---@param optionsOrCallback table|function
+---@param maybeCallback function|nil
+local function testMain(name, optionsOrCallback, maybeCallback)
+    return registerTest(name, optionsOrCallback, maybeCallback, nil)
 end
+
+---@param name string
+---@param optionsOrCallback table|function
+---@param maybeCallback function|nil
+local function testSkip(name, optionsOrCallback, maybeCallback)
+    return registerTest(name, optionsOrCallback, maybeCallback, { skip = true })
+end
+
+---@param name string
+---@param optionsOrCallback table|function
+---@param maybeCallback function|nil
+local function testOnly(name, optionsOrCallback, maybeCallback)
+    return registerTest(name, optionsOrCallback, maybeCallback, { only = true })
+end
+
+Dribble.test = setmetatable({
+    skip = testSkip,
+    only = testOnly,
+}, {
+    __call = function(_, name, optionsOrCallback, maybeCallback)
+        return testMain(name, optionsOrCallback, maybeCallback)
+    end,
+})
+
 Dribble.it = Dribble.test
-Dribble.beforeAll = function(...)
-    return notAvailable("beforeAll")
+
+---@param callback function
+function Dribble.beforeAll(callback)
+    return registry:AddHook("beforeAll", callback)
 end
-Dribble.beforeEach = function(...)
-    return notAvailable("beforeEach")
+
+---@param callback function
+function Dribble.beforeEach(callback)
+    return registry:AddHook("beforeEach", callback)
 end
-Dribble.afterEach = function(...)
-    return notAvailable("afterEach")
+
+---@param callback function
+function Dribble.afterEach(callback)
+    return registry:AddHook("afterEach", callback)
 end
-Dribble.afterAll = function(...)
-    return notAvailable("afterAll")
+
+---@param callback function
+function Dribble.afterAll(callback)
+    return registry:AddHook("afterAll", callback)
 end
 
 Dribble._internal = {
     registry = registry,
+    notAvailable = notAvailable,
     parseOptions = Options.ParseArgs,
     normalizeOptions = Options.Normalize,
     run = runInternal,
@@ -183,5 +287,11 @@ Dribble._internal = {
 }
 
 registerCommand()
+
+local bootstrapLoaded, bootstrapError = loadManifest(Options.DEFAULT_MANIFEST_PATH, false)
+if not bootstrapLoaded then
+    printWarning(string.format("[DribbleSpec] Bootstrap manifest load failed for '%s': %s",
+        tostring(Options.DEFAULT_MANIFEST_PATH), tostring(bootstrapError)))
+end
 
 return Dribble

@@ -1,6 +1,159 @@
 local ResultModel = Ext.Require("Shared/DribbleSpec/Core/ResultModel.lua")
+local Sandbox = Ext.Require("Shared/DribbleSpec/Internal/Sandbox.lua")
 
 local Runner = {}
+
+---@param message string
+---@param stack string|nil
+---@return table
+local function createErrorRecord(message, stack)
+    return {
+        message = tostring(message or "Unknown error"),
+        stack = stack,
+    }
+end
+
+---@param suite table
+---@param test table
+---@return table
+local function createContext(suite, test)
+    return {
+        meta = {
+            suiteName = suite and suite.fullName or nil,
+            testName = test and test.name or nil,
+            fullName = test and test.fullName or (suite and suite.fullName or nil),
+        },
+        sandbox = Sandbox.Create(),
+    }
+end
+
+---@param run table
+---@param suiteResult table
+---@param testResult table
+local function pushTestResult(run, suiteResult, testResult)
+    table.insert(suiteResult.tests, testResult)
+
+    if testResult.status == "passed" then
+        run.summary.passed = run.summary.passed + 1
+    elseif testResult.status == "failed" then
+        run.summary.failed = run.summary.failed + 1
+    else
+        run.summary.skipped = run.summary.skipped + 1
+    end
+end
+
+---@param nowMs function
+---@param test table
+---@param status "passed"|"failed"|"skipped"
+---@param errorRecord table|nil
+---@param skipReason string|nil
+---@return table
+local function newTestResult(nowMs, test, status, errorRecord, skipReason)
+    local started = nowMs()
+    local finished = nowMs()
+    return {
+        name = test and test.name or "[hook]",
+        fullName = test and test.fullName or "[hook]",
+        status = status,
+        tags = (test and test.metadata and test.metadata.tags) or {},
+        startedAtMs = started,
+        finishedAtMs = finished,
+        durationMs = math.max(0, finished - started),
+        error = errorRecord,
+        skipReason = skipReason,
+    }
+end
+
+---@param hook table
+---@param context table
+---@return boolean, table|nil
+local function runHook(hook, context)
+    local ok, err = xpcall(function()
+        hook.callback(context)
+    end, debug.traceback)
+
+    if ok then
+        return true, nil
+    end
+
+    return false, createErrorRecord(err, err)
+end
+
+---@param hooks table[]
+---@param context table
+---@return boolean, table|nil
+local function runHooks(hooks, context)
+    for _, hook in ipairs(hooks or {}) do
+        local ok, err = runHook(hook, context)
+        if not ok then
+            return false, err
+        end
+    end
+
+    return true, nil
+end
+
+---@param lineage table[]
+---@return table[]
+local function collectBeforeEachHooks(lineage)
+    local hooks = {}
+    for _, suite in ipairs(lineage) do
+        for _, hook in ipairs(suite.hooks.beforeEach) do
+            table.insert(hooks, hook)
+        end
+    end
+    return hooks
+end
+
+---@param lineage table[]
+---@return table[]
+local function collectAfterEachHooks(lineage)
+    local hooks = {}
+    for i = #lineage, 1, -1 do
+        local suite = lineage[i]
+        for _, hook in ipairs(suite.hooks.afterEach) do
+            table.insert(hooks, hook)
+        end
+    end
+    return hooks
+end
+
+---@param suite table
+---@return boolean
+local function suiteHasOnly(suite)
+    if suite.only == true then
+        return true
+    end
+
+    for _, test in ipairs(suite.tests or {}) do
+        if test.only == true then
+            return true
+        end
+    end
+
+    for _, child in ipairs(suite.suites or {}) do
+        if suiteHasOnly(child) then
+            return true
+        end
+    end
+
+    return false
+end
+
+---@param suite table
+---@param nowMs function
+---@return table
+local function newSuiteResult(suite, nowMs)
+    return {
+        name = suite.fullName or suite.name,
+        tags = (suite.metadata and suite.metadata.tags) or {},
+        startedAtMs = nowMs(),
+        finishedAtMs = 0,
+        durationMs = 0,
+        tests = {},
+        suites = {},
+    }
+end
 
 ---@return string
 function Runner.DetectContext()
@@ -34,13 +187,164 @@ function Runner.Run(params)
         snapshot = registry:Snapshot()
     end
 
+    local hasOnly = snapshot.hasOnly == true
+    local stopRequested = false
+
+    ---@param suite table
+    ---@param lineage table[]
+    ---@param parentSuiteResult table|nil
+    ---@param inheritedSkipReason string|nil
+    local function executeSuite(suite, lineage, parentSuiteResult, inheritedSkipReason)
+        if stopRequested then
+            return
+        end
+
+        local suiteResult = newSuiteResult(suite, nowMs)
+        if parentSuiteResult then
+            table.insert(parentSuiteResult.suites, suiteResult)
+        else
+            table.insert(run.suites, suiteResult)
+        end
+
+        local currentLineage = {}
+        for i = 1, #lineage do
+            currentLineage[i] = lineage[i]
+        end
+        table.insert(currentLineage, suite)
+
+        local focusedSkipReason = nil
+        if hasOnly and not suiteHasOnly(suite) and suite.only ~= true then
+            focusedSkipReason = "Excluded by test.only focus"
+        end
+
+        local suiteSkipReason = inheritedSkipReason
+        if not suiteSkipReason and suite.skip == true then
+            suiteSkipReason = "Suite marked skip"
+        end
+        if not suiteSkipReason and focusedSkipReason then
+            suiteSkipReason = focusedSkipReason
+        end
+
+        local setupFailureSkipReason = nil
+        if not suiteSkipReason then
+            local suiteContext = createContext(suite, nil)
+            local okBeforeAll, beforeAllError = runHooks(suite.hooks.beforeAll, suiteContext)
+            suiteContext.sandbox:RestoreAll()
+            if not okBeforeAll then
+                local hookResult = newTestResult(nowMs, {
+                    name = "[hook] beforeAll",
+                    fullName = string.format("%s [hook] beforeAll", suite.fullName or suite.name),
+                    metadata = {},
+                }, "failed", beforeAllError, nil)
+                pushTestResult(run, suiteResult, hookResult)
+                setupFailureSkipReason = "Suite beforeAll failed"
+                if options.failFast == true then
+                    stopRequested = true
+                end
+            end
+        end
+
+        local effectiveSkipReason = suiteSkipReason or setupFailureSkipReason
+
+        for _, test in ipairs(suite.tests or {}) do
+            if stopRequested then
+                break
+            end
+
+            local testSkipReason = effectiveSkipReason
+            if not testSkipReason and test.skip == true then
+                testSkipReason = "Test marked skip"
+            end
+            if not testSkipReason and hasOnly and test.only ~= true and suite.only ~= true then
+                testSkipReason = "Excluded by test.only focus"
+            end
+
+            if testSkipReason then
+                local skippedResult = newTestResult(nowMs, test, "skipped", nil, testSkipReason)
+                pushTestResult(run, suiteResult, skippedResult)
+            else
+                local testStart = nowMs()
+                local testContext = createContext(suite, test)
+                local testStatus = "passed"
+                local testError = nil
+
+                local okBeforeEach, beforeEachError = runHooks(collectBeforeEachHooks(currentLineage), testContext)
+                if not okBeforeEach then
+                    testStatus = "failed"
+                    testError = beforeEachError
+                end
+
+                if testStatus == "passed" then
+                    local okTest, testErr = xpcall(function()
+                        test.callback(testContext)
+                    end, debug.traceback)
+                    if not okTest then
+                        testStatus = "failed"
+                        testError = createErrorRecord(testErr, testErr)
+                    end
+                end
+
+                local okAfterEach, afterEachError = runHooks(collectAfterEachHooks(currentLineage), testContext)
+                if not okAfterEach and testStatus == "passed" then
+                    testStatus = "failed"
+                    testError = afterEachError
+                end
+
+                testContext.sandbox:RestoreAll()
+
+                local testFinish = nowMs()
+                local result = {
+                    name = test.name,
+                    fullName = test.fullName,
+                    status = testStatus,
+                    tags = (test.metadata and test.metadata.tags) or {},
+                    startedAtMs = testStart,
+                    finishedAtMs = testFinish,
+                    durationMs = math.max(0, testFinish - testStart),
+                    error = testError,
+                    skipReason = nil,
+                }
+                pushTestResult(run, suiteResult, result)
+
+                if testStatus == "failed" and options.failFast == true then
+                    stopRequested = true
+                end
+            end
+        end
+
+        for _, childSuite in ipairs(suite.suites or {}) do
+            executeSuite(childSuite, currentLineage, suiteResult, effectiveSkipReason)
+            if stopRequested then
+                break
+            end
+        end
+
+        if not stopRequested and not suiteSkipReason then
+            local suiteContext = createContext(suite, nil)
+            local okAfterAll, afterAllError = runHooks(suite.hooks.afterAll, suiteContext)
+            suiteContext.sandbox:RestoreAll()
+            if not okAfterAll then
+                local hookResult = newTestResult(nowMs, {
+                    name = "[hook] afterAll",
+                    fullName = string.format("%s [hook] afterAll", suite.fullName or suite.name),
+                    metadata = {},
+                }, "failed", afterAllError, nil)
+                pushTestResult(run, suiteResult, hookResult)
+                if options.failFast == true then
+                    stopRequested = true
+                end
+            end
+        end
+
+        suiteResult.finishedAtMs = nowMs()
+        suiteResult.durationMs = math.max(0, suiteResult.finishedAtMs - suiteResult.startedAtMs)
+    end
+
     for _, suite in ipairs(snapshot.suites or {}) do
-        table.insert(run.suites, {
-            name = suite.name,
-            tags = (suite.metadata and suite.metadata.tags) or {},
-            durationMs = 0,
-            tests = {},
-        })
+        executeSuite(suite, {}, nil, nil)
+        if stopRequested then
+            break
+        end
     end
 
     return ResultModel.Finalize(run, nowMs())

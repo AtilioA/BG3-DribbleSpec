@@ -18,8 +18,8 @@ Phase 0 intentionally does not include an automated test harness.
 - Command `dribble` is registered on framework load.
 - Default include manifest is `DribbleTests.lua`.
 - Missing manifest is treated as a warning in Phase 0.
-- DSL methods (`describe/test/hooks`) are placeholders until Phase 1.
+- Phase 1 implemented runnable DSL and hook execution; see `Docs/PHASE1_PLAN.md` for active TDD scope.
 
 ## Next Step
 
-Phase 1 starts strict TDD and dogfooding with DribbleSpec self-tests.
+Continue Phase 1 vertical TDD slices and expand dogfood coverage.
