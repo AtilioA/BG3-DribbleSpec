@@ -77,7 +77,7 @@ Hook context (`ctx`) includes sandbox, fixtures, runtime helpers, and expect/dou
 
 Core matchers:
 - `expect(value).toBe(expected)`
-- `expect(value).toEqual(expected)`
+- `expect(value).toEqual(expected[, opts])`
 - `expect(value).toBeNil()`
 - `expect(value).toBeTruthy()`
 - `expect(value).toBeFalsy()`
@@ -96,6 +96,7 @@ Deep equality rules:
 - Table-aware and userdata-safe.
 - Stable diffs for failure messages.
 - Optional transient-field filtering for volatile BG3 runtime fields.
+- `opts.volatilePreset` supports named ignore presets (eg. `"entity"`) when strict equality would be noisy.
 
 ### 4.4 Doubles API
 

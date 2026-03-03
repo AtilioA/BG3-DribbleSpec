@@ -6,6 +6,7 @@ local Doubles = Ext.Require("Shared/DribbleSpec/Doubles/Doubles.lua")
 local RuntimeHelpers = Ext.Require("Shared/DribbleSpec/Runtime/Helpers.lua")
 local SkipSignal = Ext.Require("Shared/DribbleSpec/Runtime/SkipSignal.lua")
 local FixtureManager = Ext.Require("Shared/DribbleSpec/Fixtures/Manager.lua")
+local EntityRef = Ext.Require("Shared/DribbleSpec/Entity/EntityRef.lua")
 
 local Runner = {}
 
@@ -60,6 +61,9 @@ local function createContext(suite, test, runContext, options)
         nextTick = runtimeHelpers.nextTick,
         waitUntil = runtimeHelpers.waitUntil,
         fixture = fixtureManager:BuildApi(),
+        entityRef = function(source)
+            return EntityRef.Create(source)
+        end,
     }
 end
 

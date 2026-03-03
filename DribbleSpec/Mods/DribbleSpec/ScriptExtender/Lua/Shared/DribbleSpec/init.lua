@@ -13,14 +13,15 @@ local ExecutionRouter = Ext.Require("Shared/DribbleSpec/Runtime/ExecutionRouter.
 local RunService = Ext.Require("Shared/DribbleSpec/Runtime/RunService.lua")
 local ServerRunChannel = Ext.Require("Shared/DribbleSpec/Runtime/ServerRunChannel.lua")
 local Expect = Ext.Require("Shared/DribbleSpec/Expect/Expect.lua")
+local EntityRef = Ext.Require("Shared/DribbleSpec/Entity/EntityRef.lua")
 
 ---@class DribbleSpecAPI
 ---@field _VERSION string
 ---@field _PHASE integer
 ---@field _internal table
 local Dribble = {
-    _VERSION = "0.6.0-phase6",
-    _PHASE = 6,
+    _VERSION = "0.7.0-phase7",
+    _PHASE = 7,
 }
 
 _G.Dribble = Dribble
@@ -111,6 +112,7 @@ ApiBinder.Bind(Dribble, registry)
 Dribble.Run = runService.Run
 Dribble.RunFromArgs = runFromArgs
 Dribble.expect = Expect.Expect
+Dribble.entityRef = EntityRef.Create
 Dribble.ResetRegistry = function()
     registry:Clear()
 end

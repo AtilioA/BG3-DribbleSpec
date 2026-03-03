@@ -1,5 +1,6 @@
 local PreplacedProvider = Ext.Require("Shared/DribbleSpec/Fixtures/Providers/PreplacedProvider.lua")
 local SpawnProvider = Ext.Require("Shared/DribbleSpec/Fixtures/Providers/SpawnProvider.lua")
+local EntityRef = Ext.Require("Shared/DribbleSpec/Entity/EntityRef.lua")
 
 ---@class DribbleFixtureManager
 ---@field private _sandbox table
@@ -171,6 +172,16 @@ local function finalizeHandle(self, kind, spec, providerName, resolved)
     handle.kind = kind
     handle.provider = providerName
     handle.spec = spec
+
+    local ref = EntityRef.TryCreate({
+        guid = handle.guid,
+        netId = handle.netId,
+        value = handle.value,
+        resolve = handle.resolve,
+    })
+    if ref ~= nil then
+        handle.ref = ref
+    end
 
     trackHandleTeardown(self, handle)
     return handle

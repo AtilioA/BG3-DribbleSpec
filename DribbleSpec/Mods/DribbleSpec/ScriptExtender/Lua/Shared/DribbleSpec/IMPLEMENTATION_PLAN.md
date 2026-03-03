@@ -211,6 +211,7 @@ Status (2026-03-03):
 - Phase 4 is complete: doubles (`ctx.mockFn`, `ctx.spyOn`, `ctx.stub`) and call assertions (`toHaveBeenCalled*`) are implemented with per-test restoration covered by self-tests.
 - Phase 5 is complete: runtime helpers (`ctx.requireClient`, `ctx.requireServer`, `ctx.nextTick`, `ctx.waitUntil`) are implemented with deterministic fallback guardrails covered by self-tests.
 - Phase 6 is complete: fixture manager/provider pipeline, fixture APIs (`ctx.fixture.character/item/entity`), and state snapshot/restore cleanup guarantees are implemented and covered by self-tests.
+- Phase 7 is complete: `EntityRef` lazy re-resolution, entity domain matchers (`toBeGuid`, `toBeEntity`, `toHaveComponent`), and optional `toEqual(..., { volatilePreset = "entity" })` filtering are implemented and covered by self-tests.
 - Client runtime dogfood run observed with totals `passed=31 failed=0 skipped=1 total=32`.
 - Server-context execution remains available through NetChannel routing for `--context server` from client sessions.
 

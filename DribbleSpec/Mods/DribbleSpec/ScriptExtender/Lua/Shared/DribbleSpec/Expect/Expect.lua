@@ -3,6 +3,10 @@ local Format = Ext.Require("Shared/DribbleSpec/Expect/Format.lua")
 local DeepEqual = Ext.Require("Shared/DribbleSpec/Expect/DeepEqual.lua")
 local Diff = Ext.Require("Shared/DribbleSpec/Expect/Diff.lua")
 local Doubles = Ext.Require("Shared/DribbleSpec/Doubles/Doubles.lua")
+local EntityRef = Ext.Require("Shared/DribbleSpec/Entity/EntityRef.lua")
+local VolatileFilters = Ext.Require("Shared/DribbleSpec/Expect/VolatileFilters.lua")
+
+local GUID_PATTERN = "^%x%x%x%x%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%x%x%x%x%x%x%x%x$"
 
 ---@param matcherName string
 ---@param message string
@@ -132,6 +136,115 @@ local function hasCallWithSubsetTable(state, subset)
     return false
 end
 
+---@param value any
+---@return boolean
+local function isGuid(value)
+    return type(value) == "string" and string.match(value, GUID_PATTERN) ~= nil
+end
+
+---@param value any
+---@return any|nil, string|nil
+local function resolveFromEntityRef(value)
+    if type(value) ~= "table" then
+        return nil, nil
+    end
+
+    local ref = value
+    if not (value.__dribbleEntityRef == true and type(value.Resolve) == "function") then
+        if type(value.ref) == "table" and value.ref.__dribbleEntityRef == true and type(value.ref.Resolve) == "function" then
+            ref = value.ref
+        else
+            return nil, nil
+        end
+    end
+
+    local ok, resolvedOrErr = pcall(ref.Resolve, ref)
+    if not ok then
+        return nil, tostring(resolvedOrErr)
+    end
+
+    if resolvedOrErr == nil then
+        return nil, "entity reference could not be resolved"
+    end
+
+    return resolvedOrErr, nil
+end
+
+---@param value any
+---@return any|nil, string|nil
+local function resolveEntityCandidate(value)
+    local resolvedFromRef, refErr = resolveFromEntityRef(value)
+    if resolvedFromRef ~= nil then
+        if EntityRef.IsEntityLike(resolvedFromRef) then
+            return resolvedFromRef, nil
+        end
+
+        return nil, "resolved value is not an entity"
+    end
+
+    if refErr ~= nil then
+        return nil, refErr
+    end
+
+    if EntityRef.IsEntityLike(value) then
+        return value, nil
+    end
+
+    local inferredRef = EntityRef.TryCreate(value)
+    if inferredRef ~= nil then
+        local resolved = inferredRef:Resolve()
+        if EntityRef.IsEntityLike(resolved) then
+            return resolved, nil
+        end
+
+        return nil, "entity reference could not be resolved"
+    end
+
+    return nil, "value is not an entity or entity reference"
+end
+
+---@param entity any
+---@param componentName string
+---@return any
+local function readComponent(entity, componentName)
+    local getComponent = nil
+    local okMethod, methodOrErr = pcall(function()
+        return entity.GetComponent
+    end)
+    if okMethod and type(methodOrErr) == "function" then
+        getComponent = methodOrErr
+    end
+
+    if type(getComponent) == "function" then
+        local okCall, valueOrErr = pcall(getComponent, entity, componentName)
+        if okCall then
+            return valueOrErr
+        end
+    end
+
+    local okAll, allOrErr = pcall(function()
+        return entity.GetAllComponents
+    end)
+    if okAll and type(allOrErr) == "function" then
+        local okComponents, componentsOrErr = pcall(allOrErr, entity)
+        if okComponents and type(componentsOrErr) == "table" then
+            local component = componentsOrErr[componentName]
+            if component ~= nil then
+                return component
+            end
+        end
+    end
+
+    local okIndex, valueOrErr = pcall(function()
+        return entity[componentName]
+    end)
+    if okIndex then
+        return valueOrErr
+    end
+
+    return nil
+end
+
 ---@param actual any
 ---@return table
 function Expect.Create(actual)
@@ -174,10 +287,59 @@ function Expect.Create(actual)
 
             fail("toContain", string.format("unsupported container type '%s'", type(actual)))
         end,
-        toEqual = function(expected)
-            local equal, detail = DeepEqual.Compare(expected, actual)
+        toEqual = function(expected, options)
+            if options ~= nil and type(options) ~= "table" then
+                fail("toEqual", "options must be a table when provided")
+            end
+
+            local expectedValue = expected
+            local actualValue = actual
+            if type(options) == "table" and options.volatilePreset ~= nil then
+                local okExpected, filteredExpectedOrErr = pcall(VolatileFilters.ApplyPreset, expectedValue,
+                    options.volatilePreset)
+                if not okExpected then
+                    fail("toEqual", tostring(filteredExpectedOrErr))
+                end
+
+                local okActual, filteredActualOrErr = pcall(VolatileFilters.ApplyPreset, actualValue,
+                    options.volatilePreset)
+                if not okActual then
+                    fail("toEqual", tostring(filteredActualOrErr))
+                end
+
+                expectedValue = filteredExpectedOrErr
+                actualValue = filteredActualOrErr
+            end
+
+            local equal, detail = DeepEqual.Compare(expectedValue, actualValue)
             if not equal then
                 fail("toEqual", Diff.FromMismatch(detail))
+            end
+        end,
+        toBeGuid = function()
+            if not isGuid(actual) then
+                fail("toBeGuid", string.format("expected GUID string, actual=%s", renderValue(actual)))
+            end
+        end,
+        toBeEntity = function()
+            local entity, reason = resolveEntityCandidate(actual)
+            if entity == nil then
+                fail("toBeEntity", tostring(reason or "value is not an entity"))
+            end
+        end,
+        toHaveComponent = function(componentName)
+            if type(componentName) ~= "string" or componentName == "" then
+                fail("toHaveComponent", "component name must be a non-empty string")
+            end
+
+            local entity, reason = resolveEntityCandidate(actual)
+            if entity == nil then
+                fail("toHaveComponent", tostring(reason or "value is not an entity"))
+            end
+
+            local component = readComponent(entity, componentName)
+            if component == nil then
+                fail("toHaveComponent", string.format("component '%s' was not found", componentName))
             end
         end,
         toHaveBeenCalled = function()
