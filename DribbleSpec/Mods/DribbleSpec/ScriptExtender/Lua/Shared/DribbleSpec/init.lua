@@ -19,8 +19,8 @@ local Expect = Ext.Require("Shared/DribbleSpec/Expect/Expect.lua")
 ---@field _PHASE integer
 ---@field _internal table
 local Dribble = {
-    _VERSION = "0.5.0-phase5",
-    _PHASE = 5,
+    _VERSION = "0.6.0-phase6",
+    _PHASE = 6,
 }
 
 _G.Dribble = Dribble
@@ -103,7 +103,7 @@ local function registerCommand()
 end
 
 local function notAvailable(name)
-    error(string.format("DribbleSpec Phase 5: '%s' is not implemented yet.", name), 2)
+    error(string.format("DribbleSpec Phase 6: '%s' is not implemented yet.", name), 2)
 end
 
 ApiBinder.Bind(Dribble, registry)

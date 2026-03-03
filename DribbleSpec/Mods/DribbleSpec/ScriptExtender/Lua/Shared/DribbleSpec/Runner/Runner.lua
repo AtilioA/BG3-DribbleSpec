@@ -5,6 +5,7 @@ local Expect = Ext.Require("Shared/DribbleSpec/Expect/Expect.lua")
 local Doubles = Ext.Require("Shared/DribbleSpec/Doubles/Doubles.lua")
 local RuntimeHelpers = Ext.Require("Shared/DribbleSpec/Runtime/Helpers.lua")
 local SkipSignal = Ext.Require("Shared/DribbleSpec/Runtime/SkipSignal.lua")
+local FixtureManager = Ext.Require("Shared/DribbleSpec/Fixtures/Manager.lua")
 
 local Runner = {}
 
@@ -29,6 +30,13 @@ local function createContext(suite, test, runContext, options)
         context = runContext,
         options = options,
     })
+    local fixtureManager = FixtureManager.Create({
+        sandbox = sandbox,
+        context = runContext,
+        options = options,
+        suite = suite,
+        test = test,
+    })
 
     return {
         meta = {
@@ -51,6 +59,7 @@ local function createContext(suite, test, runContext, options)
         requireServer = runtimeHelpers.requireServer,
         nextTick = runtimeHelpers.nextTick,
         waitUntil = runtimeHelpers.waitUntil,
+        fixture = fixtureManager:BuildApi(),
     }
 end
 
