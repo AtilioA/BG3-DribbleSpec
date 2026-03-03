@@ -24,7 +24,7 @@ end
 
 ---@param printLine fun(message: string)
 function ConsoleIO.PrintHelp(printLine)
-    printLine("DribbleSpec (Phase 1) usage:")
+    printLine("DribbleSpec (Phase 3) usage:")
     printLine("  dribble [--help] [--manifest <path>] [--name <pattern>] [--tag <tag>] [--context <client|server|any>] [--fail-fast] [--mod-uuid <uuid>] [--json-out <path>]")
     printLine("Defaults:")
     printLine("  --manifest DribbleTests.lua")

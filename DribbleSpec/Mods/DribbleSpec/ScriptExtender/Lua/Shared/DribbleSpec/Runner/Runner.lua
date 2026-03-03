@@ -1,6 +1,7 @@
 local ResultModel = Ext.Require("Shared/DribbleSpec/Core/ResultModel.lua")
 local Sandbox = Ext.Require("Shared/DribbleSpec/Internal/Sandbox.lua")
 local Filter = Ext.Require("Shared/DribbleSpec/Runner/Filter.lua")
+local Expect = Ext.Require("Shared/DribbleSpec/Expect/Expect.lua")
 
 local Runner = {}
 
@@ -25,6 +26,7 @@ local function createContext(suite, test)
             fullName = test and test.fullName or (suite and suite.fullName or nil),
         },
         sandbox = Sandbox.Create(),
+        expect = Expect.Expect,
     }
 end
 

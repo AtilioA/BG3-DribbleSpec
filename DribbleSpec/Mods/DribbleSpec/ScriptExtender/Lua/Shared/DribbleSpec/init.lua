@@ -12,14 +12,15 @@ local ConsoleReporter = Ext.Require("Shared/DribbleSpec/Reporters/ConsoleReporte
 local ExecutionRouter = Ext.Require("Shared/DribbleSpec/Runtime/ExecutionRouter.lua")
 local RunService = Ext.Require("Shared/DribbleSpec/Runtime/RunService.lua")
 local ServerRunChannel = Ext.Require("Shared/DribbleSpec/Runtime/ServerRunChannel.lua")
+local Expect = Ext.Require("Shared/DribbleSpec/Expect/Expect.lua")
 
 ---@class DribbleSpecAPI
 ---@field _VERSION string
 ---@field _PHASE integer
 ---@field _internal table
 local Dribble = {
-    _VERSION = "0.2.0-phase1",
-    _PHASE = 1,
+    _VERSION = "0.3.0-phase3",
+    _PHASE = 3,
 }
 
 _G.Dribble = Dribble
@@ -102,13 +103,14 @@ local function registerCommand()
 end
 
 local function notAvailable(name)
-    error(string.format("DribbleSpec Phase 1: '%s' is not implemented yet.", name), 2)
+    error(string.format("DribbleSpec Phase 3: '%s' is not implemented yet.", name), 2)
 end
 
 ApiBinder.Bind(Dribble, registry)
 
 Dribble.Run = runService.Run
 Dribble.RunFromArgs = runFromArgs
+Dribble.expect = Expect.Expect
 Dribble.ResetRegistry = function()
     registry:Clear()
 end
@@ -119,6 +121,7 @@ end
 Dribble._internal = {
     registry = registry,
     notAvailable = notAvailable,
+    expect = Expect.Expect,
     parseOptions = Options.ParseArgs,
     normalizeOptions = Options.Normalize,
     run = runService.Run,
