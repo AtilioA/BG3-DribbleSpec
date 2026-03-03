@@ -203,11 +203,12 @@ Each slice rule:
 - Deterministic ordering is proven by self-tests.
 - No tests rely on internal modules or private state.
 
-Status (2026-03-02):
-- Functional behavior slices are implemented and covered through dogfood tests.
-- Client runtime pass observed with totals `passed=9 failed=0 skipped=1 total=10`.
-- Server-context execution is available through NetChannel routing for `--context server` from client sessions.
-- Phase 2 deep-dive is in progress: runner filtering (`--name`, repeatable `--tag`, `--context`) and `--fail-fast` coverage expansion.
+Status (2026-03-03):
+- Phase 1 functional behavior slices are implemented and covered through dogfood tests.
+- Phase 2 is complete: filtering (`--name`, repeatable `--tag`, `--context`) and `--fail-fast` controls are implemented and covered by self-tests.
+- Phase 3 is complete: `expect` core matchers (`toBe`, `toEqual`, `toBeNil`, `toBeTruthy`, `toBeFalsy`, `toContain`, `toThrow`, `toThrowMatch`) with deterministic deep-equality diff output are implemented and covered by self-tests.
+- Client runtime dogfood run observed with totals `passed=31 failed=0 skipped=1 total=32`.
+- Server-context execution remains available through NetChannel routing for `--context server` from client sessions.
 
 ## Phase 0 Deep Dive
 
