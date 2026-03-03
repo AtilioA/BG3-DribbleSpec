@@ -3,6 +3,8 @@ local Sandbox = Ext.Require("Shared/DribbleSpec/Internal/Sandbox.lua")
 local Filter = Ext.Require("Shared/DribbleSpec/Runner/Filter.lua")
 local Expect = Ext.Require("Shared/DribbleSpec/Expect/Expect.lua")
 local Doubles = Ext.Require("Shared/DribbleSpec/Doubles/Doubles.lua")
+local RuntimeHelpers = Ext.Require("Shared/DribbleSpec/Runtime/Helpers.lua")
+local SkipSignal = Ext.Require("Shared/DribbleSpec/Runtime/SkipSignal.lua")
 
 local Runner = {}
 
@@ -18,9 +20,15 @@ end
 
 ---@param suite table
 ---@param test table
+---@param runContext string
+---@param options table
 ---@return table
-local function createContext(suite, test)
+local function createContext(suite, test, runContext, options)
     local sandbox = Sandbox.Create()
+    local runtimeHelpers = RuntimeHelpers.Create({
+        context = runContext,
+        options = options,
+    })
 
     return {
         meta = {
@@ -39,7 +47,21 @@ local function createContext(suite, test)
         stub = function(target, methodName, impl)
             return Doubles.CreateStub(sandbox, target, methodName, impl)
         end,
+        requireClient = runtimeHelpers.requireClient,
+        requireServer = runtimeHelpers.requireServer,
+        nextTick = runtimeHelpers.nextTick,
+        waitUntil = runtimeHelpers.waitUntil,
     }
+end
+
+---@param err any
+---@return any
+local function tracebackOrSkip(err)
+    if SkipSignal.Is(err) then
+        return err
+    end
+
+    return debug.traceback(tostring(err), 2)
 end
 
 ---@param run table
@@ -85,10 +107,17 @@ end
 local function runHook(hook, context)
     local ok, err = xpcall(function()
         hook.callback(context)
-    end, debug.traceback)
+    end, tracebackOrSkip)
 
     if ok then
         return true, nil
+    end
+
+    if SkipSignal.Is(err) then
+        return false, {
+            skipReason = SkipSignal.Reason(err),
+            skipped = true,
+        }
     end
 
     return false, createErrorRecord(err, err)
@@ -272,19 +301,23 @@ function Runner.Run(params)
 
         local setupFailureSkipReason = nil
         if not suiteSkipReason then
-            local suiteContext = createContext(suite, nil)
+            local suiteContext = createContext(suite, nil, run.context, options)
             local okBeforeAll, beforeAllError = runHooks(suite.hooks.beforeAll, suiteContext)
             suiteContext.sandbox:RestoreAll()
             if not okBeforeAll then
-                local hookResult = newTestResult(nowMs, {
-                    name = "[hook] beforeAll",
-                    fullName = string.format("%s [hook] beforeAll", suite.fullName or suite.name),
-                    metadata = {},
-                }, "failed", beforeAllError, nil)
-                pushTestResult(run, suiteResult, hookResult)
-                setupFailureSkipReason = "Suite beforeAll failed"
-                if options.failFast == true then
-                    stopRequested = true
+                if type(beforeAllError) == "table" and beforeAllError.skipped == true then
+                    setupFailureSkipReason = beforeAllError.skipReason or "Skipped by runtime helper"
+                else
+                    local hookResult = newTestResult(nowMs, {
+                        name = "[hook] beforeAll",
+                        fullName = string.format("%s [hook] beforeAll", suite.fullName or suite.name),
+                        metadata = {},
+                    }, "failed", beforeAllError, nil)
+                    pushTestResult(run, suiteResult, hookResult)
+                    setupFailureSkipReason = "Suite beforeAll failed"
+                    if options.failFast == true then
+                        stopRequested = true
+                    end
                 end
             end
         end
@@ -310,30 +343,46 @@ function Runner.Run(params)
                     pushTestResult(run, suiteResult, skippedResult)
                 else
                     local testStart = nowMs()
-                    local testContext = createContext(suite, test)
+                    local testContext = createContext(suite, test, run.context, options)
                     local testStatus = "passed"
                     local testError = nil
+                    local testSkipReason = nil
 
                     local okBeforeEach, beforeEachError = runHooks(collectBeforeEachHooks(currentLineage), testContext)
                     if not okBeforeEach then
-                        testStatus = "failed"
-                        testError = beforeEachError
+                        if type(beforeEachError) == "table" and beforeEachError.skipped == true then
+                            testStatus = "skipped"
+                            testSkipReason = beforeEachError.skipReason or "Skipped by runtime helper"
+                        else
+                            testStatus = "failed"
+                            testError = beforeEachError
+                        end
                     end
 
                     if testStatus == "passed" then
                         local okTest, testErr = xpcall(function()
                             test.callback(testContext)
-                        end, debug.traceback)
+                        end, tracebackOrSkip)
                         if not okTest then
-                            testStatus = "failed"
-                            testError = createErrorRecord(testErr, testErr)
+                            if SkipSignal.Is(testErr) then
+                                testStatus = "skipped"
+                                testSkipReason = SkipSignal.Reason(testErr)
+                            else
+                                testStatus = "failed"
+                                testError = createErrorRecord(testErr, testErr)
+                            end
                         end
                     end
 
                     local okAfterEach, afterEachError = runHooks(collectAfterEachHooks(currentLineage), testContext)
                     if not okAfterEach and testStatus == "passed" then
-                        testStatus = "failed"
-                        testError = afterEachError
+                        if type(afterEachError) == "table" and afterEachError.skipped == true then
+                            testStatus = "skipped"
+                            testSkipReason = afterEachError.skipReason or "Skipped by runtime helper"
+                        else
+                            testStatus = "failed"
+                            testError = afterEachError
+                        end
                     end
 
                     testContext.sandbox:RestoreAll()
@@ -348,7 +397,7 @@ function Runner.Run(params)
                         finishedAtMs = testFinish,
                         durationMs = math.max(0, testFinish - testStart),
                         error = testError,
-                        skipReason = nil,
+                        skipReason = testSkipReason,
                     }
                     pushTestResult(run, suiteResult, result)
 
@@ -367,18 +416,20 @@ function Runner.Run(params)
         end
 
         if not stopRequested and not suiteSkipReason then
-            local suiteContext = createContext(suite, nil)
+            local suiteContext = createContext(suite, nil, run.context, options)
             local okAfterAll, afterAllError = runHooks(suite.hooks.afterAll, suiteContext)
             suiteContext.sandbox:RestoreAll()
             if not okAfterAll then
-                local hookResult = newTestResult(nowMs, {
-                    name = "[hook] afterAll",
-                    fullName = string.format("%s [hook] afterAll", suite.fullName or suite.name),
-                    metadata = {},
-                }, "failed", afterAllError, nil)
-                pushTestResult(run, suiteResult, hookResult)
-                if options.failFast == true then
-                    stopRequested = true
+                if type(afterAllError) ~= "table" or afterAllError.skipped ~= true then
+                    local hookResult = newTestResult(nowMs, {
+                        name = "[hook] afterAll",
+                        fullName = string.format("%s [hook] afterAll", suite.fullName or suite.name),
+                        metadata = {},
+                    }, "failed", afterAllError, nil)
+                    pushTestResult(run, suiteResult, hookResult)
+                    if options.failFast == true then
+                        stopRequested = true
+                    end
                 end
             end
         end
