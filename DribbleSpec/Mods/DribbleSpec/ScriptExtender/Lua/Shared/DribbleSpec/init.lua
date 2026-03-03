@@ -6,6 +6,7 @@ local Clock = Ext.Require("Shared/DribbleSpec/Internal/Clock.lua")
 local Sandbox = Ext.Require("Shared/DribbleSpec/Internal/Sandbox.lua")
 local CallerMod = Ext.Require("Shared/DribbleSpec/Internal/CallerMod.lua")
 local ManifestLoader = Ext.Require("Shared/DribbleSpec/Internal/ManifestLoader.lua")
+local ConsoleReporter = Ext.Require("Shared/DribbleSpec/Reporters/ConsoleReporter.lua")
 
 ---@class DribbleSpecAPI
 ---@field _VERSION string
@@ -68,23 +69,6 @@ local function printHelp()
     printLine("  --manifest DribbleTests.lua")
 end
 
----@param runResult table
-local function printSummary(runResult)
-    local summary = runResult.summary or {}
-    local warningsCount = #(runResult.warnings or {})
-    printLine(string.format(
-        "[DribbleSpec] status=%s context=%s passed=%d failed=%d skipped=%d total=%d warnings=%d durationMs=%d",
-        tostring(runResult.status),
-        tostring(runResult.context),
-        summary.passed or 0,
-        summary.failed or 0,
-        summary.skipped or 0,
-        summary.total or 0,
-        warningsCount,
-        runResult.durationMs or 0
-    ))
-end
-
 ---@param options table|nil
 ---@return table
 local function runInternal(options)
@@ -135,10 +119,10 @@ local function runFromArgs(args)
     end
 
     local runResult = runInternal(options)
-    printSummary(runResult)
-    for _, warning in ipairs(runResult.warnings or {}) do
-        printWarning("[DribbleSpec] " .. warning)
-    end
+    ConsoleReporter.PrintRun(runResult, {
+        printLine = printLine,
+        printWarning = printWarning,
+    })
 
     return runResult
 end
