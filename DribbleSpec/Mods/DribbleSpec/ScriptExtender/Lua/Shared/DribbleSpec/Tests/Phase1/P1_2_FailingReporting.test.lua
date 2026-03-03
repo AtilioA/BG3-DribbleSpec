@@ -2,7 +2,7 @@ local Dribble = _G.Dribble or Ext.Require("Shared/DribbleSpec/init.lua")
 local Assertions = Ext.Require("Shared/DribbleSpec/Tests/Support/Assertions.lua")
 local RunnerHarness = Ext.Require("Shared/DribbleSpec/Tests/Support/RunnerHarness.lua")
 
-Dribble.describe("DribbleSpec Phase1 P1.2 failing reporting", function()
+Dribble.describe("DribbleSpec Phase1 P1.2 failing reporting", { tags = { "unit", "phase1" } }, function()
     Dribble.test("captures failed test error message and stack", function()
         local run = RunnerHarness.Run(function(dsl)
             dsl.describe("P1.2 inner suite", function()

@@ -2,7 +2,7 @@ local Dribble = _G.Dribble or Ext.Require("Shared/DribbleSpec/init.lua")
 local Assertions = Ext.Require("Shared/DribbleSpec/Tests/Support/Assertions.lua")
 local RunnerHarness = Ext.Require("Shared/DribbleSpec/Tests/Support/RunnerHarness.lua")
 
-Dribble.describe("DribbleSpec Phase1 P1.9 afterEach failure", function()
+Dribble.describe("DribbleSpec Phase1 P1.9 afterEach failure", { tags = { "unit", "phase1" } }, function()
     Dribble.test("fails current test only and continues with later tests", function()
         local afterEachCalls = 0
         local secondTestRan = false

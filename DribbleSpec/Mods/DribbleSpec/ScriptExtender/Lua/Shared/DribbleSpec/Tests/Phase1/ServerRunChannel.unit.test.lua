@@ -2,7 +2,7 @@ local Dribble = _G.Dribble or Ext.Require("Shared/DribbleSpec/init.lua")
 local Assertions = Ext.Require("Shared/DribbleSpec/Tests/Support/Assertions.lua")
 local ServerRunChannel = Ext.Require("Shared/DribbleSpec/Runtime/ServerRunChannel.lua")
 
-Dribble.describe("DribbleSpec ServerRunChannel unit", function()
+Dribble.describe("DribbleSpec ServerRunChannel unit", { tags = { "unit", "phase1" } }, function()
     Dribble.test("warns when client channel is unavailable", function()
         local warningMessage = nil
         local callbackPayload = nil

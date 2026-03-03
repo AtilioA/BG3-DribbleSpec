@@ -1,7 +1,7 @@
 local Dribble = _G.Dribble or Ext.Require("Shared/DribbleSpec/init.lua")
 local Assertions = Ext.Require("Shared/DribbleSpec/Tests/Support/Assertions.lua")
 
-Dribble.describe("DribbleSpec RunFromArgs integration", function()
+Dribble.describe("DribbleSpec RunFromArgs integration", { tags = { "integration", "phase1" } }, function()
     Dribble.test("returns deterministic empty run for --help", function()
         local run = Dribble.RunFromArgs({ "dribble", "--help" })
 

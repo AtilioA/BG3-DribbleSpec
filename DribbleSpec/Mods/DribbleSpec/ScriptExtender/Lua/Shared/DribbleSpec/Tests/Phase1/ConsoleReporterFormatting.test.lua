@@ -3,7 +3,7 @@ local Assertions = Ext.Require("Shared/DribbleSpec/Tests/Support/Assertions.lua"
 local RunnerHarness = Ext.Require("Shared/DribbleSpec/Tests/Support/RunnerHarness.lua")
 local ConsoleReporter = Ext.Require("Shared/DribbleSpec/Reporters/ConsoleReporter.lua")
 
-Dribble.describe("DribbleSpec Console Reporter Formatting", function()
+Dribble.describe("DribbleSpec Console Reporter Formatting", { tags = { "unit", "phase1" } }, function()
     Dribble.test("shows colored squares and all test outcomes", function()
         local run = RunnerHarness.Run(function(dsl)
             dsl.describe("Reporter demo suite", function()

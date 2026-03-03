@@ -23,7 +23,7 @@ local order = {}
 local skippedExecuted = false
 local crossSuiteAfterAllRan = false
 
-Dribble.describe("DribbleSpec Phase1 Smoke", function()
+Dribble.describe("DribbleSpec Phase1 Smoke", { tags = { "unit", "phase1" } }, function()
     Dribble.beforeAll(function()
         order = {}
         skippedExecuted = false
@@ -78,7 +78,7 @@ Dribble.describe("DribbleSpec Phase1 Smoke", function()
     end)
 end)
 
-Dribble.describe("DribbleSpec Phase1 CrossSuite", function()
+Dribble.describe("DribbleSpec Phase1 CrossSuite", { tags = { "unit", "phase1" } }, function()
     Dribble.test("afterAll from previous suite ran before next suite starts", function()
         assertEquals(crossSuiteAfterAllRan, true, "afterAll should run before next suite test")
     end)

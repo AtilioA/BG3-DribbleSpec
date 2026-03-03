@@ -2,7 +2,7 @@ local Dribble = _G.Dribble or Ext.Require("Shared/DribbleSpec/init.lua")
 local Assertions = Ext.Require("Shared/DribbleSpec/Tests/Support/Assertions.lua")
 local RunnerHarness = Ext.Require("Shared/DribbleSpec/Tests/Support/RunnerHarness.lua")
 
-Dribble.describe("DribbleSpec Phase1 P1.10 nested describe", function()
+Dribble.describe("DribbleSpec Phase1 P1.10 nested describe", { tags = { "unit", "phase1" } }, function()
     Dribble.test("preserves nested full names and hook execution order", function()
         local trace = {}
 
