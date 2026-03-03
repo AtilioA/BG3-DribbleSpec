@@ -43,4 +43,5 @@ Phase 1 starts strict TDD and dogfooding.
 
 - Completed slices: 1, 2, 3, 4, 5, 6, 7, 8, 9, 10.
 - Current dogfood totals on client runtime: `passed=9 failed=0 skipped=1 total=10`.
-- Remaining gate before Phase 2 kickoff: capture an equivalent passing run in server context (DAP currently returns `No stack frame available` when evaluating on server thread).
+- Server-context routing from client is implemented via NetChannel request/response; equivalent server-context runs are available without DAP frame evaluation.
+- Phase 2 kickoff has started with runner filtering and fail-fast deep-dive coverage.

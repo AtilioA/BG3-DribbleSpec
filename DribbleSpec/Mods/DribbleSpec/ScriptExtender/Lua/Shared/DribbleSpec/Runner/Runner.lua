@@ -1,5 +1,6 @@
 local ResultModel = Ext.Require("Shared/DribbleSpec/Core/ResultModel.lua")
 local Sandbox = Ext.Require("Shared/DribbleSpec/Internal/Sandbox.lua")
+local Filter = Ext.Require("Shared/DribbleSpec/Runner/Filter.lua")
 
 local Runner = {}
 
@@ -179,6 +180,7 @@ function Runner.Run(params)
     local options = params.options or {}
     local clock = params.clock
     local nowMs = (clock and clock.NowMs) and clock.NowMs or function() return 0 end
+    local filter = Filter.Create(options)
 
     local run = ResultModel.NewRun(Runner.DetectContext(), options, nowMs())
 
@@ -192,10 +194,39 @@ function Runner.Run(params)
 
     ---@param suite table
     ---@param lineage table[]
+    ---@return boolean
+    local function suiteHasSelectedTests(suite, lineage)
+        local currentLineage = {}
+        for i = 1, #lineage do
+            currentLineage[i] = lineage[i]
+        end
+        table.insert(currentLineage, suite)
+
+        for _, test in ipairs(suite.tests or {}) do
+            if filter.ShouldIncludeTest(currentLineage, test) then
+                return true
+            end
+        end
+
+        for _, childSuite in ipairs(suite.suites or {}) do
+            if suiteHasSelectedTests(childSuite, currentLineage) then
+                return true
+            end
+        end
+
+        return false
+    end
+
+    ---@param suite table
+    ---@param lineage table[]
     ---@param parentSuiteResult table|nil
     ---@param inheritedSkipReason string|nil
     local function executeSuite(suite, lineage, parentSuiteResult, inheritedSkipReason)
         if stopRequested then
+            return
+        end
+
+        if not suiteHasSelectedTests(suite, lineage) then
             return
         end
 
@@ -251,63 +282,65 @@ function Runner.Run(params)
                 break
             end
 
-            local testSkipReason = effectiveSkipReason
-            if not testSkipReason and test.skip == true then
-                testSkipReason = "Test marked skip"
-            end
-            if not testSkipReason and hasOnly and test.only ~= true and suite.only ~= true then
-                testSkipReason = "Excluded by test.only focus"
-            end
-
-            if testSkipReason then
-                local skippedResult = newTestResult(nowMs, test, "skipped", nil, testSkipReason)
-                pushTestResult(run, suiteResult, skippedResult)
-            else
-                local testStart = nowMs()
-                local testContext = createContext(suite, test)
-                local testStatus = "passed"
-                local testError = nil
-
-                local okBeforeEach, beforeEachError = runHooks(collectBeforeEachHooks(currentLineage), testContext)
-                if not okBeforeEach then
-                    testStatus = "failed"
-                    testError = beforeEachError
+            if filter.ShouldIncludeTest(currentLineage, test) then
+                local testSkipReason = effectiveSkipReason
+                if not testSkipReason and test.skip == true then
+                    testSkipReason = "Test marked skip"
+                end
+                if not testSkipReason and hasOnly and test.only ~= true and suite.only ~= true then
+                    testSkipReason = "Excluded by test.only focus"
                 end
 
-                if testStatus == "passed" then
-                    local okTest, testErr = xpcall(function()
-                        test.callback(testContext)
-                    end, debug.traceback)
-                    if not okTest then
+                if testSkipReason then
+                    local skippedResult = newTestResult(nowMs, test, "skipped", nil, testSkipReason)
+                    pushTestResult(run, suiteResult, skippedResult)
+                else
+                    local testStart = nowMs()
+                    local testContext = createContext(suite, test)
+                    local testStatus = "passed"
+                    local testError = nil
+
+                    local okBeforeEach, beforeEachError = runHooks(collectBeforeEachHooks(currentLineage), testContext)
+                    if not okBeforeEach then
                         testStatus = "failed"
-                        testError = createErrorRecord(testErr, testErr)
+                        testError = beforeEachError
                     end
-                end
 
-                local okAfterEach, afterEachError = runHooks(collectAfterEachHooks(currentLineage), testContext)
-                if not okAfterEach and testStatus == "passed" then
-                    testStatus = "failed"
-                    testError = afterEachError
-                end
+                    if testStatus == "passed" then
+                        local okTest, testErr = xpcall(function()
+                            test.callback(testContext)
+                        end, debug.traceback)
+                        if not okTest then
+                            testStatus = "failed"
+                            testError = createErrorRecord(testErr, testErr)
+                        end
+                    end
 
-                testContext.sandbox:RestoreAll()
+                    local okAfterEach, afterEachError = runHooks(collectAfterEachHooks(currentLineage), testContext)
+                    if not okAfterEach and testStatus == "passed" then
+                        testStatus = "failed"
+                        testError = afterEachError
+                    end
 
-                local testFinish = nowMs()
-                local result = {
-                    name = test.name,
-                    fullName = test.fullName,
-                    status = testStatus,
-                    tags = (test.metadata and test.metadata.tags) or {},
-                    startedAtMs = testStart,
-                    finishedAtMs = testFinish,
-                    durationMs = math.max(0, testFinish - testStart),
-                    error = testError,
-                    skipReason = nil,
-                }
-                pushTestResult(run, suiteResult, result)
+                    testContext.sandbox:RestoreAll()
 
-                if testStatus == "failed" and options.failFast == true then
-                    stopRequested = true
+                    local testFinish = nowMs()
+                    local result = {
+                        name = test.name,
+                        fullName = test.fullName,
+                        status = testStatus,
+                        tags = (test.metadata and test.metadata.tags) or {},
+                        startedAtMs = testStart,
+                        finishedAtMs = testFinish,
+                        durationMs = math.max(0, testFinish - testStart),
+                        error = testError,
+                        skipReason = nil,
+                    }
+                    pushTestResult(run, suiteResult, result)
+
+                    if testStatus == "failed" and options.failFast == true then
+                        stopRequested = true
+                    end
                 end
             end
         end

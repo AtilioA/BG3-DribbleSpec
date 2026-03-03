@@ -8,3 +8,7 @@ Ext.Require("Shared/DribbleSpec/Tests/Phase1/ConsoleReporterFormatting.test.lua"
 Ext.Require("Shared/DribbleSpec/Tests/Phase1/ExecutionRouterRemoteServer.test.lua")
 Ext.Require("Shared/DribbleSpec/Tests/Phase1/ServerRunChannel.unit.test.lua")
 Ext.Require("Shared/DribbleSpec/Tests/Phase1/RunFromArgs.integration.test.lua")
+Ext.Require("Shared/DribbleSpec/Tests/Phase2/P2_1_NameFilter.test.lua")
+Ext.Require("Shared/DribbleSpec/Tests/Phase2/P2_2_TagFilterAnd.test.lua")
+Ext.Require("Shared/DribbleSpec/Tests/Phase2/P2_3_ContextFilter.test.lua")
+Ext.Require("Shared/DribbleSpec/Tests/Phase2/P2_4_FailFast.test.lua")

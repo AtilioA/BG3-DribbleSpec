@@ -206,7 +206,8 @@ Each slice rule:
 Status (2026-03-02):
 - Functional behavior slices are implemented and covered through dogfood tests.
 - Client runtime pass observed with totals `passed=9 failed=0 skipped=1 total=10`.
-- Final verification step pending: successful server-context runtime execution in current BG3 session.
+- Server-context execution is available through NetChannel routing for `--context server` from client sessions.
+- Phase 2 deep-dive is in progress: runner filtering (`--name`, repeatable `--tag`, `--context`) and `--fail-fast` coverage expansion.
 
 ## Phase 0 Deep Dive
 

@@ -2,6 +2,12 @@ local Options = {}
 
 Options.DEFAULT_MANIFEST_PATH = "DribbleTests.lua"
 
+local VALID_CONTEXTS = {
+    any = true,
+    client = true,
+    server = true,
+}
+
 ---@param options table|nil
 ---@return table
 function Options.Normalize(options)
@@ -15,6 +21,10 @@ function Options.Normalize(options)
         normalized.context = "any"
     else
         normalized.context = string.lower(normalized.context)
+    end
+
+    if VALID_CONTEXTS[normalized.context] ~= true then
+        normalized.context = "any"
     end
 
     normalized.failFast = normalized.failFast == true
