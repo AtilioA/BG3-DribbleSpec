@@ -5,3 +5,4 @@ Ext.Require("Shared/DribbleSpec/Tests/Phase1/P1_8_BeforeAllFailureSkip.test.lua"
 Ext.Require("Shared/DribbleSpec/Tests/Phase1/P1_9_AfterEachFailureCurrentOnly.test.lua")
 Ext.Require("Shared/DribbleSpec/Tests/Phase1/P1_10_NestedDescribeOrder.test.lua")
 Ext.Require("Shared/DribbleSpec/Tests/Phase1/ConsoleReporterFormatting.test.lua")
+Ext.Require("Shared/DribbleSpec/Tests/Phase1/ExecutionRouterRemoteServer.test.lua")

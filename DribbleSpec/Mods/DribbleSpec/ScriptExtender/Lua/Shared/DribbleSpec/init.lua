@@ -7,6 +7,7 @@ local Sandbox = Ext.Require("Shared/DribbleSpec/Internal/Sandbox.lua")
 local CallerMod = Ext.Require("Shared/DribbleSpec/Internal/CallerMod.lua")
 local ManifestLoader = Ext.Require("Shared/DribbleSpec/Internal/ManifestLoader.lua")
 local ConsoleReporter = Ext.Require("Shared/DribbleSpec/Reporters/ConsoleReporter.lua")
+local ExecutionRouter = Ext.Require("Shared/DribbleSpec/Runtime/ExecutionRouter.lua")
 
 ---@class DribbleSpecAPI
 ---@field _VERSION string
@@ -21,6 +22,23 @@ _G.Dribble = Dribble
 
 local registry = Registry.Create()
 local loadedManifests = {}
+local serverRunChannel = nil
+
+local SERVER_RUN_CHANNEL_NAME = "DribbleSpec_RunServer"
+
+---@return table|nil
+local function getServerRunChannel()
+    if serverRunChannel then
+        return serverRunChannel
+    end
+
+    if type(Ext) ~= "table" or type(Ext.Net) ~= "table" or type(Ext.Net.CreateChannel) ~= "function" then
+        return nil
+    end
+
+    serverRunChannel = Ext.Net.CreateChannel(ModuleUUID, SERVER_RUN_CHANNEL_NAME)
+    return serverRunChannel
+end
 
 ---@param manifestPath string
 ---@param forceReload boolean|nil
@@ -118,13 +136,70 @@ local function runFromArgs(args)
         return ResultModel.Finalize(ResultModel.NewRun("unknown", options, 0), 0)
     end
 
-    local runResult = runInternal(options)
-    ConsoleReporter.PrintRun(runResult, {
+    local runResult = ExecutionRouter.Run(options, {
+        isClient = function()
+            return type(Ext) == "table" and type(Ext.IsClient) == "function" and Ext.IsClient() == true
+        end,
+        requestServerRun = function(remoteOptions, onReply)
+            local channel = getServerRunChannel()
+            if not channel or type(channel.RequestToServer) ~= "function" then
+                printWarning("[DribbleSpec] Server run channel unavailable on client.")
+                onReply(nil)
+                return
+            end
+
+            channel:RequestToServer({
+                options = remoteOptions,
+            }, function(response)
+                onReply(response)
+            end)
+        end,
+        runLocal = runInternal,
+        renderRun = function(run)
+            ConsoleReporter.PrintRun(run, {
+                printLine = printLine,
+                printWarning = printWarning,
+            })
+        end,
+        buildPendingRun = function(pendingOptions)
+            local pending = ResultModel.NewRun("client", pendingOptions, 0)
+            ResultModel.AddWarning(pending,
+                "Server-context run requested from client; final result will print asynchronously.")
+            return ResultModel.Finalize(pending, 0)
+        end,
         printLine = printLine,
         printWarning = printWarning,
     })
 
     return runResult
+end
+
+local function registerServerRunHandler()
+    if rawget(_G, "__DRIBBLESPEC_SERVER_RUN_HANDLER_REGISTERED") then
+        return
+    end
+
+    if type(Ext) ~= "table" or type(Ext.IsServer) ~= "function" or Ext.IsServer() ~= true then
+        return
+    end
+
+    local channel = getServerRunChannel()
+    if not channel or type(channel.SetRequestHandler) ~= "function" then
+        return
+    end
+
+    channel:SetRequestHandler(function(data, _)
+        local payload = type(data) == "table" and data or {}
+        local remoteOptions = Options.Normalize(payload.options or {})
+        remoteOptions.context = "server"
+
+        local runResult = runInternal(remoteOptions)
+        return {
+            runResult = runResult,
+        }
+    end)
+
+    rawset(_G, "__DRIBBLESPEC_SERVER_RUN_HANDLER_REGISTERED", true)
 end
 
 local function registerCommand()
@@ -271,6 +346,7 @@ Dribble._internal = {
 }
 
 registerCommand()
+registerServerRunHandler()
 
 local bootstrapLoaded, bootstrapError = loadManifest(Options.DEFAULT_MANIFEST_PATH, false)
 if not bootstrapLoaded then
