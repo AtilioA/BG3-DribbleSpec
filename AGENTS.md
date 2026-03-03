@@ -85,7 +85,7 @@ Use the tdd skill to implement the TDD workflow.
 - Use `bg3se-console-ops` for iterative BG3SE console/test output workflows.
 - Do not add speculative framework features ahead of active TDD slice.
 - If uncertain about BG3SE API, use the Context7 MCP.
-- Commit and push often.
+- Commit and push often! Create semantic commits whenever possible.
 
 ## Surprise Log Policy
 
