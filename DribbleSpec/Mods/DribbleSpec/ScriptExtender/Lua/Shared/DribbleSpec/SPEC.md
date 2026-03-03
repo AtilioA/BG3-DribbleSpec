@@ -176,6 +176,9 @@ After each test:
 - modified state restored from snapshot;
 - test-added subscriptions/listeners removed (when possible via wrappers).
 
+Workflow convention:
+- tests that intentionally mutate live world state (eg. real deletions) should use a dedicated `destructive` tag so consumers can opt in explicitly (`dribble --tag destructive`).
+
 ## 7) Runner and Filtering
 
 ### 7.1 Execution Model
