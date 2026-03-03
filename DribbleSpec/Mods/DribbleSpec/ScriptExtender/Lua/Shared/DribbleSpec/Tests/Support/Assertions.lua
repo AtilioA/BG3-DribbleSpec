@@ -20,4 +20,15 @@ function Assertions.Contains(value, needle, label)
     end
 end
 
+---@param value string
+---@param needle string
+---@param label string
+function Assertions.NotContains(value, needle, label)
+    local haystack = tostring(value)
+    local token = tostring(needle)
+    if string.find(haystack, token, 1, true) then
+        error(string.format("%s: expected '%s' to not contain '%s'", tostring(label), haystack, token))
+    end
+end
+
 return Assertions

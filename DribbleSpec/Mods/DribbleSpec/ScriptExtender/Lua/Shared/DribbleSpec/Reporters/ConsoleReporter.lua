@@ -77,6 +77,21 @@ local function statusBar(status, count)
     return string.rep(statusIcon(status), count)
 end
 
+---@param label string
+---@param status string|nil
+---@param value integer
+---@return string
+local function summaryMetricLine(label, status, value)
+    local countText = string.format("%s (%d):", label, value)
+    local metricValue = tostring(value)
+
+    if status then
+        metricValue = statusBar(status, value)
+    end
+
+    return string.format("  %s %s", color(countText, COLORS.white), metricValue)
+end
+
 ---@param lines string[]
 ---@param suite table
 ---@param depth integer
@@ -84,18 +99,31 @@ local function appendSuiteLines(lines, suite, depth)
     local indent = string.rep("  ", depth)
     local passed, failed, skipped = countSuiteStatus(suite)
     local suiteName = tostring(suite.name or "[unnamed suite]")
+    local metrics = {}
+
+    if passed > 0 then
+        table.insert(metrics, string.format("%s %s", statusIcon("passed"), color(tostring(passed), COLORS.green, true)))
+    end
+
+    if failed > 0 then
+        table.insert(metrics, string.format("%s %s", statusIcon("failed"), color(tostring(failed), COLORS.red, true)))
+    end
+
+    if skipped > 0 then
+        table.insert(metrics, string.format("%s %s", statusIcon("skipped"), color(tostring(skipped), COLORS.yellow, true)))
+    end
+
+    local metricsText = ""
+    if #metrics > 0 then
+        metricsText = "  " .. table.concat(metrics, "  ")
+    end
 
     table.insert(lines,
-        string.format("%s%s %s  %s %s  %s %s  %s %s",
+        string.format("%s%s %s%s",
             indent,
             color("Suite:", COLORS.cyan, true),
             color(suiteName, COLORS.white, true),
-            statusIcon("passed"),
-            color(tostring(passed), COLORS.green, true),
-            statusIcon("failed"),
-            color(tostring(failed), COLORS.red, true),
-            statusIcon("skipped"),
-            color(tostring(skipped), COLORS.yellow, true)
+            metricsText
         ))
 
     for _, test in ipairs(suite.tests or {}) do
@@ -142,18 +170,18 @@ function ConsoleReporter.BuildLines(runResult)
         ))
 
     table.insert(lines, color("", COLORS.gray))
-    table.insert(lines, color("Results", COLORS.white, true))
+    table.insert(lines, color("RESULTS", COLORS.white, true))
     for _, suite in ipairs(runResult.suites or {}) do
         appendSuiteLines(lines, suite, 0)
     end
 
     table.insert(lines, color("", COLORS.gray))
-    table.insert(lines, color("Summary", COLORS.white, true))
-    table.insert(lines, string.format("  %s %s", color("Passed:", COLORS.white), statusBar("passed", passed)))
-    table.insert(lines, string.format("  %s %s", color("Failed:", COLORS.white), statusBar("failed", failed)))
-    table.insert(lines, string.format("  %s %s", color("Skipped:", COLORS.white), statusBar("skipped", skipped)))
-    table.insert(lines, string.format("  %s %s", color("Total:", COLORS.white), color(tostring(total), COLORS.white, true)))
-    table.insert(lines, string.format("  %s %s", color("DurationMs:", COLORS.white), color(tostring(durationMs), COLORS.white, true)))
+    table.insert(lines, color("SUMMARY", COLORS.white, true))
+    table.insert(lines, summaryMetricLine("Passed", "passed", passed))
+    table.insert(lines, summaryMetricLine("Failed", "failed", failed))
+    table.insert(lines, summaryMetricLine("Skipped", "skipped", skipped))
+    table.insert(lines, summaryMetricLine("Total", nil, total))
+    table.insert(lines, summaryMetricLine("DurationMs", nil, durationMs))
 
     return lines
 end
