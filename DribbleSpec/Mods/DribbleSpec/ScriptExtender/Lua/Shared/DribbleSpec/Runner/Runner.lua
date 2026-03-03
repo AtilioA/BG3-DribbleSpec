@@ -2,6 +2,7 @@ local ResultModel = Ext.Require("Shared/DribbleSpec/Core/ResultModel.lua")
 local Sandbox = Ext.Require("Shared/DribbleSpec/Internal/Sandbox.lua")
 local Filter = Ext.Require("Shared/DribbleSpec/Runner/Filter.lua")
 local Expect = Ext.Require("Shared/DribbleSpec/Expect/Expect.lua")
+local Doubles = Ext.Require("Shared/DribbleSpec/Doubles/Doubles.lua")
 
 local Runner = {}
 
@@ -19,14 +20,25 @@ end
 ---@param test table
 ---@return table
 local function createContext(suite, test)
+    local sandbox = Sandbox.Create()
+
     return {
         meta = {
             suiteName = suite and suite.fullName or nil,
             testName = test and test.name or nil,
             fullName = test and test.fullName or (suite and suite.fullName or nil),
         },
-        sandbox = Sandbox.Create(),
+        sandbox = sandbox,
         expect = Expect.Expect,
+        mockFn = function(impl)
+            return Doubles.CreateMockFn(impl)
+        end,
+        spyOn = function(target, methodName)
+            return Doubles.CreateSpyOn(sandbox, target, methodName)
+        end,
+        stub = function(target, methodName, impl)
+            return Doubles.CreateStub(sandbox, target, methodName, impl)
+        end,
     }
 end
 

@@ -2,6 +2,7 @@ local Expect = {}
 local Format = Ext.Require("Shared/DribbleSpec/Expect/Format.lua")
 local DeepEqual = Ext.Require("Shared/DribbleSpec/Expect/DeepEqual.lua")
 local Diff = Ext.Require("Shared/DribbleSpec/Expect/Diff.lua")
+local Doubles = Ext.Require("Shared/DribbleSpec/Doubles/Doubles.lua")
 
 ---@param matcherName string
 ---@param message string
@@ -45,6 +46,90 @@ local function captureThrownError(fn)
     end
 
     return true, tostring(err)
+end
+
+---@param value any
+---@param matcherName string
+---@return table
+local function requireDoubleState(value, matcherName)
+    if not Doubles.IsDouble(value) then
+        fail(matcherName, "value is not a mock/spy function")
+    end
+
+    local state = Doubles.GetState(value)
+    if type(state) ~= "table" then
+        fail(matcherName, "value is not a mock/spy function")
+    end
+
+    return state
+end
+
+---@param state table
+---@param expectedArgs table
+---@return boolean
+local function hasCallWithExactArgs(state, expectedArgs)
+    local calls = state.calls or {}
+    for _, callArgs in ipairs(calls) do
+        if (callArgs.n or 0) == (expectedArgs.n or 0) then
+            local allMatch = true
+            for i = 1, expectedArgs.n do
+                local equal = DeepEqual.Compare(expectedArgs[i], callArgs[i])
+                if not equal then
+                    allMatch = false
+                    break
+                end
+            end
+
+            if allMatch then
+                return true
+            end
+        end
+    end
+
+    return false
+end
+
+---@param subset any
+---@param candidate any
+---@return boolean
+local function isSubsetMatch(subset, candidate)
+    if type(subset) ~= "table" then
+        local equal = DeepEqual.Compare(subset, candidate)
+        return equal == true
+    end
+
+    if type(candidate) ~= "table" then
+        return false
+    end
+
+    for key, subsetValue in pairs(subset) do
+        if candidate[key] == nil then
+            return false
+        end
+
+        if not isSubsetMatch(subsetValue, candidate[key]) then
+            return false
+        end
+    end
+
+    return true
+end
+
+---@param state table
+---@param subset table
+---@return boolean
+local function hasCallWithSubsetTable(state, subset)
+    local calls = state.calls or {}
+    for _, callArgs in ipairs(calls) do
+        local argCount = callArgs.n or 0
+        for i = 1, argCount do
+            if type(callArgs[i]) == "table" and isSubsetMatch(subset, callArgs[i]) then
+                return true
+            end
+        end
+    end
+
+    return false
 end
 
 ---@param actual any
@@ -93,6 +178,44 @@ function Expect.Create(actual)
             local equal, detail = DeepEqual.Compare(expected, actual)
             if not equal then
                 fail("toEqual", Diff.FromMismatch(detail))
+            end
+        end,
+        toHaveBeenCalled = function()
+            local state = requireDoubleState(actual, "toHaveBeenCalled")
+            if (state.callCount or 0) < 1 then
+                fail("toHaveBeenCalled", "expected function to be called at least once")
+            end
+        end,
+        toHaveBeenCalledTimes = function(expectedCount)
+            if type(expectedCount) ~= "number" then
+                fail("toHaveBeenCalledTimes", "expected call count must be a number")
+            end
+
+            local state = requireDoubleState(actual, "toHaveBeenCalledTimes")
+            local callCount = state.callCount or 0
+            if callCount ~= expectedCount then
+                fail("toHaveBeenCalledTimes", string.format("expected=%s actual=%s", tostring(expectedCount),
+                    tostring(callCount)))
+            end
+        end,
+        toHaveBeenCalledWith = function(...)
+            local state = requireDoubleState(actual, "toHaveBeenCalledWith")
+            local expectedArgs = {
+                n = select("#", ...),
+                ...,
+            }
+            if not hasCallWithExactArgs(state, expectedArgs) then
+                fail("toHaveBeenCalledWith", "no recorded call matched expected arguments")
+            end
+        end,
+        toHaveBeenCalledWithMatch = function(expectedSubset)
+            if type(expectedSubset) ~= "table" then
+                fail("toHaveBeenCalledWithMatch", "expected subset must be a table")
+            end
+
+            local state = requireDoubleState(actual, "toHaveBeenCalledWithMatch")
+            if not hasCallWithSubsetTable(state, expectedSubset) then
+                fail("toHaveBeenCalledWithMatch", "no table argument matched expected subset")
             end
         end,
         toThrow = function()
