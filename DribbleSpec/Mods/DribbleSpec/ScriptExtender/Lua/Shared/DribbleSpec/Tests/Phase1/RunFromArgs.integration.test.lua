@@ -1,0 +1,15 @@
+local Dribble = _G.Dribble or Ext.Require("Shared/DribbleSpec/init.lua")
+local Assertions = Ext.Require("Shared/DribbleSpec/Tests/Support/Assertions.lua")
+
+Dribble.describe("DribbleSpec RunFromArgs integration", function()
+    Dribble.test("returns deterministic empty run for --help", function()
+        local run = Dribble.RunFromArgs({ "dribble", "--help" })
+
+        Assertions.Equals(run.status, "passed", "run status")
+        Assertions.Equals(run.context, "unknown", "run context")
+        Assertions.Equals(run.summary.total, 0, "summary total")
+        Assertions.Equals(run.summary.passed, 0, "summary passed")
+        Assertions.Equals(run.summary.failed, 0, "summary failed")
+        Assertions.Equals(run.summary.skipped, 0, "summary skipped")
+    end)
+end)

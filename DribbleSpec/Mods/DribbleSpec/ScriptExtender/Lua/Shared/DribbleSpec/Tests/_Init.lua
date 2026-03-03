@@ -6,3 +6,5 @@ Ext.Require("Shared/DribbleSpec/Tests/Phase1/P1_9_AfterEachFailureCurrentOnly.te
 Ext.Require("Shared/DribbleSpec/Tests/Phase1/P1_10_NestedDescribeOrder.test.lua")
 Ext.Require("Shared/DribbleSpec/Tests/Phase1/ConsoleReporterFormatting.test.lua")
 Ext.Require("Shared/DribbleSpec/Tests/Phase1/ExecutionRouterRemoteServer.test.lua")
+Ext.Require("Shared/DribbleSpec/Tests/Phase1/ServerRunChannel.unit.test.lua")
+Ext.Require("Shared/DribbleSpec/Tests/Phase1/RunFromArgs.integration.test.lua")
