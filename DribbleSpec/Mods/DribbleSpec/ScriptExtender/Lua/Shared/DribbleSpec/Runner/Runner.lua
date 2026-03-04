@@ -77,6 +77,47 @@ local function tracebackOrSkip(err)
     return debug.traceback(tostring(err), 2)
 end
 
+---@param assertionEvents table[]|nil
+---@param phase string
+---@return fun(event: table)|nil
+local function createAssertionCollector(assertionEvents, phase)
+    if type(assertionEvents) ~= "table" then
+        return nil
+    end
+
+    return function(event)
+        if type(event) ~= "table" then
+            return
+        end
+
+        table.insert(assertionEvents, {
+            phase = phase,
+            matcher = tostring(event.matcher or "unknown"),
+            status = tostring(event.status or "unknown"),
+            actual = event.actual,
+            expected = event.expected,
+            error = event.error,
+        })
+    end
+end
+
+---@param callback function
+---@param assertionCollector fun(event: table)|nil
+---@return boolean, any
+local function runWithAssertionObserver(callback, assertionCollector)
+    if type(Expect.SetAssertionObserver) == "function" then
+        Expect.SetAssertionObserver(assertionCollector)
+    end
+
+    local ok, err = xpcall(callback, tracebackOrSkip)
+
+    if type(Expect.SetAssertionObserver) == "function" then
+        Expect.SetAssertionObserver(nil)
+    end
+
+    return ok, err
+end
+
 ---@param run table
 ---@param suiteResult table
 ---@param testResult table
@@ -116,38 +157,42 @@ end
 
 ---@param hook table
 ---@param context table
----@return boolean, table|nil
-local function runHook(hook, context)
-    local ok, err = xpcall(function()
+---@param phase string
+---@param assertionEvents table[]|nil
+---@return boolean, table|nil, string
+local function runHook(hook, context, phase, assertionEvents)
+    local ok, err = runWithAssertionObserver(function()
         hook.callback(context)
-    end, tracebackOrSkip)
+    end, createAssertionCollector(assertionEvents, phase))
 
     if ok then
-        return true, nil
+        return true, nil, "passed"
     end
 
     if SkipSignal.Is(err) then
         return false, {
             skipReason = SkipSignal.Reason(err),
             skipped = true,
-        }
+        }, "skipped"
     end
 
-    return false, createErrorRecord(err, err)
+    return false, createErrorRecord(err, err), "failed"
 end
 
 ---@param hooks table[]
 ---@param context table
----@return boolean, table|nil
-local function runHooks(hooks, context)
+---@param phase string
+---@param assertionEvents table[]|nil
+---@return boolean, table|nil, string
+local function runHooks(hooks, context, phase, assertionEvents)
     for _, hook in ipairs(hooks or {}) do
-        local ok, err = runHook(hook, context)
+        local ok, err, status = runHook(hook, context, phase, assertionEvents)
         if not ok then
-            return false, err
+            return false, err, status
         end
     end
 
-    return true, nil
+    return true, nil, "passed"
 end
 
 ---@param lineage table[]
@@ -311,7 +356,8 @@ function Runner.Run(params)
         local setupFailureSkipReason = nil
         if not suiteSkipReason then
             local suiteContext = createContext(suite, nil, run.context, options)
-            local okBeforeAll, beforeAllError = runHooks(suite.hooks.beforeAll, suiteContext)
+            local beforeAllAssertions = options.verbose == true and {} or nil
+            local okBeforeAll, beforeAllError = runHooks(suite.hooks.beforeAll, suiteContext, "beforeAll", beforeAllAssertions)
             suiteContext.sandbox:RestoreAll()
             if not okBeforeAll then
                 if type(beforeAllError) == "table" and beforeAllError.skipped == true then
@@ -322,6 +368,9 @@ function Runner.Run(params)
                         fullName = string.format("%s [hook] beforeAll", suite.fullName or suite.name),
                         metadata = {},
                     }, "failed", beforeAllError, nil)
+                    if options.verbose == true and beforeAllAssertions and #beforeAllAssertions > 0 then
+                        hookResult.assertions = beforeAllAssertions
+                    end
                     pushTestResult(run, suiteResult, hookResult)
                     setupFailureSkipReason = "Suite beforeAll failed"
                     if options.failFast == true then
@@ -356,8 +405,17 @@ function Runner.Run(params)
                     local testStatus = "passed"
                     local testError = nil
                     local testSkipReason = nil
+                    local assertionEvents = options.verbose == true and {} or nil
+                    local hookPhases = options.verbose == true and {} or nil
 
-                    local okBeforeEach, beforeEachError = runHooks(collectBeforeEachHooks(currentLineage), testContext)
+                    local okBeforeEach, beforeEachError, beforeEachStatus = runHooks(
+                        collectBeforeEachHooks(currentLineage),
+                        testContext,
+                        "beforeEach",
+                        assertionEvents)
+                    if hookPhases then
+                        hookPhases.beforeEach = beforeEachStatus
+                    end
                     if not okBeforeEach then
                         if type(beforeEachError) == "table" and beforeEachError.skipped == true then
                             testStatus = "skipped"
@@ -369,9 +427,9 @@ function Runner.Run(params)
                     end
 
                     if testStatus == "passed" then
-                        local okTest, testErr = xpcall(function()
+                        local okTest, testErr = runWithAssertionObserver(function()
                             test.callback(testContext)
-                        end, tracebackOrSkip)
+                        end, createAssertionCollector(assertionEvents, "test"))
                         if not okTest then
                             if SkipSignal.Is(testErr) then
                                 testStatus = "skipped"
@@ -383,7 +441,14 @@ function Runner.Run(params)
                         end
                     end
 
-                    local okAfterEach, afterEachError = runHooks(collectAfterEachHooks(currentLineage), testContext)
+                    local okAfterEach, afterEachError, afterEachStatus = runHooks(
+                        collectAfterEachHooks(currentLineage),
+                        testContext,
+                        "afterEach",
+                        assertionEvents)
+                    if hookPhases then
+                        hookPhases.afterEach = afterEachStatus
+                    end
                     if not okAfterEach and testStatus == "passed" then
                         if type(afterEachError) == "table" and afterEachError.skipped == true then
                             testStatus = "skipped"
@@ -407,6 +472,8 @@ function Runner.Run(params)
                         durationMs = math.max(0, testFinish - testStart),
                         error = testError,
                         skipReason = testSkipReason,
+                        assertions = assertionEvents,
+                        hookPhases = hookPhases,
                     }
                     pushTestResult(run, suiteResult, result)
 
@@ -426,7 +493,8 @@ function Runner.Run(params)
 
         if not stopRequested and not suiteSkipReason then
             local suiteContext = createContext(suite, nil, run.context, options)
-            local okAfterAll, afterAllError = runHooks(suite.hooks.afterAll, suiteContext)
+            local afterAllAssertions = options.verbose == true and {} or nil
+            local okAfterAll, afterAllError = runHooks(suite.hooks.afterAll, suiteContext, "afterAll", afterAllAssertions)
             suiteContext.sandbox:RestoreAll()
             if not okAfterAll then
                 if type(afterAllError) ~= "table" or afterAllError.skipped ~= true then
@@ -435,6 +503,9 @@ function Runner.Run(params)
                         fullName = string.format("%s [hook] afterAll", suite.fullName or suite.name),
                         metadata = {},
                     }, "failed", afterAllError, nil)
+                    if options.verbose == true and afterAllAssertions and #afterAllAssertions > 0 then
+                        hookResult.assertions = afterAllAssertions
+                    end
                     pushTestResult(run, suiteResult, hookResult)
                     if options.failFast == true then
                         stopRequested = true

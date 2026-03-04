@@ -15,6 +15,9 @@ DribbleSpec.describe("DribbleSpec Phase2 P2.5 help topic parsing", { tags = { "u
 
         local tagOptions = DribbleSpec._internal.parseOptions({ "dribbles", "-h", "--tag" })
         Assertions.Equals(tagOptions.helpTopic, "tag", "tag help topic")
+
+        local verboseOptions = DribbleSpec._internal.parseOptions({ "dribbles", "--help", "--verbose" })
+        Assertions.Equals(verboseOptions.helpTopic, "verbose", "verbose help topic")
     end)
 
     DribbleSpec.test("keeps help topic unset when no topic is provided", function()
@@ -35,5 +38,13 @@ DribbleSpec.describe("DribbleSpec Phase2 P2.5 help topic parsing", { tags = { "u
         Assertions.Equals(#options.unknownArgs, 2, "unknown args count")
         Assertions.Equals(options.unknownArgs[1], "--manifest", "unknown option")
         Assertions.Equals(options.unknownArgs[2], "MyTests.lua", "unknown value")
+    end)
+
+    DribbleSpec.test("parses --verbose and -v flags", function()
+        local longForm = DribbleSpec._internal.parseOptions({ "dribbles", "--verbose" })
+        Assertions.Equals(longForm.verbose, true, "long flag")
+
+        local shortForm = DribbleSpec._internal.parseOptions({ "dribbles", "-v" })
+        Assertions.Equals(shortForm.verbose, true, "short flag")
     end)
 end)

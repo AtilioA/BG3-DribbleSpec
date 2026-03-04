@@ -8,15 +8,81 @@ local VolatileFilters = Ext.Require("Shared/DribbleSpec/Expect/VolatileFilters.l
 
 local GUID_PATTERN = "^%x%x%x%x%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%x%x%x%x%x%x%x%x$"
 
+---@type fun(event: table)|nil
+local assertionObserver = nil
+
+---@param value any
+---@return string
+local renderValue
+
 ---@param matcherName string
 ---@param message string
 local function fail(matcherName, message)
     error(string.format("expect.%s failed: %s", tostring(matcherName), tostring(message)), 3)
 end
 
+---@param observer fun(event: table)|nil
+function Expect.SetAssertionObserver(observer)
+    if observer ~= nil and type(observer) ~= "function" then
+        error("Expect.SetAssertionObserver(observer) requires a function or nil", 2)
+    end
+
+    assertionObserver = observer
+end
+
+---@param event table
+local function emitAssertion(event)
+    if type(assertionObserver) ~= "function" then
+        return
+    end
+
+    pcall(assertionObserver, event)
+end
+
+---@param matcherName string
+---@param actual any
+---@param matcher function
+---@return function
+local function wrapMatcher(matcherName, actual, matcher)
+    return function(...)
+        if type(assertionObserver) ~= "function" then
+            return matcher(...)
+        end
+
+        local argCount = select("#", ...)
+        local args = { ... }
+        local expected = nil
+        if argCount > 0 then
+            expected = renderValue(args[1])
+        end
+
+        local ok, err = pcall(function()
+            matcher(table.unpack(args, 1, argCount))
+        end)
+        if ok then
+            emitAssertion({
+                matcher = matcherName,
+                status = "passed",
+                actual = renderValue(actual),
+                expected = expected,
+            })
+            return
+        end
+
+        emitAssertion({
+            matcher = matcherName,
+            status = "failed",
+            actual = renderValue(actual),
+            expected = expected,
+            error = tostring(err),
+        })
+        error(err, 0)
+    end
+end
+
 ---@param value any
 ---@return string
-local function renderValue(value)
+renderValue = function(value)
     return Format.Value(value)
 end
 
@@ -248,7 +314,7 @@ end
 ---@param actual any
 ---@return table
 function Expect.Create(actual)
-    return {
+    local matchers = {
         toBe = function(expected)
             if actual ~= expected then
                 fail("toBe", string.format("expected=%s actual=%s", tostring(expected), tostring(actual)))
@@ -403,6 +469,14 @@ function Expect.Create(actual)
             end
         end,
     }
+
+    for matcherName, matcher in pairs(matchers) do
+        if type(matcher) == "function" then
+            matchers[matcherName] = wrapMatcher(matcherName, actual, matcher)
+        end
+    end
+
+    return matchers
 end
 
 ---@param actual any

@@ -5,6 +5,7 @@ local HELP_TOPICS = {
     "tag",
     "context",
     "fail-fast",
+    "verbose",
     "mod-uuid",
     "json-out",
 }
@@ -22,6 +23,9 @@ local HELP_TOPIC_ALIASES = {
     ["fail-fast"] = "fail-fast",
     ["--fail-fast"] = "fail-fast",
     ["failfast"] = "fail-fast",
+    ["verbose"] = "verbose",
+    ["--verbose"] = "verbose",
+    ["-v"] = "verbose",
     ["mod-uuid"] = "mod-uuid",
     ["--mod-uuid"] = "mod-uuid",
     ["moduuid"] = "mod-uuid",
@@ -73,6 +77,7 @@ local function printOverview(printLine)
     printLine("  --tag <tag>                    Require tagged tests; repeat to require all tags (AND)")
     printLine("  --context <client|server|any>  Filter by context tag semantics (default: any)")
     printLine("  --fail-fast                    Stop run after first failure")
+    printLine("  -v, --verbose                  Print assertion and hook details")
     printLine("  --mod-uuid <uuid>              Caller module UUID for run metadata")
     printLine("  --json-out <path>              Reserved output path for JSON report metadata")
     printLine("")
@@ -128,6 +133,14 @@ local function printTopicHelp(printLine, topic)
         printLine("  Syntax: --fail-fast")
         printLine("  Stops execution after the first failure in the current run.")
         printLine("  Example: dribbles --fail-fast")
+        return true
+    end
+
+    if topic == "verbose" then
+        printLine("Topic: verbose")
+        printLine("  Syntax: -v | --verbose")
+        printLine("  Prints assertion and hook details for each executed test.")
+        printLine("  Example: dribbles --verbose")
         return true
     end
 

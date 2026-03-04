@@ -17,6 +17,7 @@ DribbleSpec.describe("DribbleSpec console help formatting", { tags = { "unit", "
         Assertions.Contains(output, "Options:", "options heading")
         Assertions.Contains(output, "--tag <tag>", "tag option")
         Assertions.Contains(output, "--context <client|server|any>", "context option")
+        Assertions.Contains(output, "-v, --verbose", "verbose option")
         Assertions.Contains(output, "Examples:", "examples heading")
         Assertions.Contains(output, "dribbles --help tag", "tag example")
         Assertions.Contains(output, "d --name phase2", "shorthand example")
@@ -42,6 +43,17 @@ DribbleSpec.describe("DribbleSpec console help formatting", { tags = { "unit", "
         Assertions.Contains(contextOutput, "Topic: context", "context topic heading")
         Assertions.Contains(contextOutput, "client", "context client detail")
         Assertions.Contains(contextOutput, "server", "context server detail")
+    end)
+
+    DribbleSpec.test("prints topic help for verbose", function()
+        local lines = {}
+        ConsoleIO.PrintHelp(function(message)
+            table.insert(lines, message)
+        end, "verbose")
+
+        local output = table.concat(lines, "\n")
+        Assertions.Contains(output, "Topic: verbose", "verbose topic heading")
+        Assertions.Contains(output, "Syntax: -v | --verbose", "verbose syntax")
     end)
 
     DribbleSpec.test("prints unknown topic guidance with available topics", function()

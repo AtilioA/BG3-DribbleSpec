@@ -95,7 +95,8 @@ end
 ---@param lines string[]
 ---@param suite table
 ---@param depth integer
-local function appendSuiteLines(lines, suite, depth)
+---@param verbose boolean
+local function appendSuiteLines(lines, suite, depth, verbose)
     local indent = string.rep("  ", depth)
     local passed, failed, skipped = countSuiteStatus(suite)
     local suiteName = tostring(suite.name or "[unnamed suite]")
@@ -138,10 +139,67 @@ local function appendSuiteLines(lines, suite, depth)
             table.insert(lines, string.format("%s    %s %s", indent, color("skip:", COLORS.yellow, true),
                 color(tostring(test.skipReason), COLORS.yellow)))
         end
+
+        if verbose == true then
+            local hookPhases = test.hookPhases or {}
+            if type(hookPhases) == "table" and (hookPhases.beforeEach ~= nil or hookPhases.afterEach ~= nil) then
+                local beforeEach = tostring(hookPhases.beforeEach or "none")
+                local afterEach = tostring(hookPhases.afterEach or "none")
+                table.insert(lines,
+                    string.format("%s    %s beforeEach=%s afterEach=%s",
+                        indent,
+                        color("hooks:", COLORS.gray, true),
+                        color(beforeEach, COLORS.gray),
+                        color(afterEach, COLORS.gray)))
+            end
+
+            local assertions = test.assertions or {}
+            if type(assertions) == "table" and #assertions > 0 then
+                local passedAssertions = 0
+                local failedAssertions = 0
+                for _, assertion in ipairs(assertions) do
+                    if assertion.status == "passed" then
+                        passedAssertions = passedAssertions + 1
+                    elseif assertion.status == "failed" then
+                        failedAssertions = failedAssertions + 1
+                    end
+                end
+
+                table.insert(lines,
+                    string.format("%s    %s %d (%d passed, %d failed)",
+                        indent,
+                        color("assertions:", COLORS.gray, true),
+                        #assertions,
+                        passedAssertions,
+                        failedAssertions))
+
+                for _, assertion in ipairs(assertions) do
+                    local assertionStatus = tostring(assertion.status or "unknown")
+                    local assertionColor = COLORS.yellow
+                    if assertionStatus == "passed" then
+                        assertionColor = COLORS.green
+                    elseif assertionStatus == "failed" then
+                        assertionColor = COLORS.red
+                    end
+
+                    local detail = string.format("phase=%s", tostring(assertion.phase or "unknown"))
+                    if assertion.expected ~= nil then
+                        detail = detail .. string.format(" expected=%s", tostring(assertion.expected))
+                    end
+
+                    table.insert(lines,
+                        string.format("%s      %s %s %s",
+                            indent,
+                            color("assert", COLORS.gray),
+                            color(tostring(assertion.matcher or "unknown"), assertionColor, true),
+                            color(detail, COLORS.gray)))
+                end
+            end
+        end
     end
 
     for _, childSuite in ipairs(suite.suites or {}) do
-        appendSuiteLines(lines, childSuite, depth + 1)
+        appendSuiteLines(lines, childSuite, depth + 1, verbose)
     end
 end
 
@@ -157,6 +215,7 @@ function ConsoleReporter.BuildLines(runResult)
     local status = tostring(runResult.status or "unknown")
     local context = tostring(runResult.context or "unknown")
     local durationMs = tonumber(runResult.durationMs or 0) or 0
+    local verbose = runResult.options and runResult.options.verbose == true
 
     local runStatusText = status == "failed" and color("FAILED", COLORS.red, true) or color("PASSED", COLORS.green, true)
     table.insert(lines,
@@ -173,7 +232,7 @@ function ConsoleReporter.BuildLines(runResult)
     table.insert(lines, color("", COLORS.gray))
     table.insert(lines, color("RESULTS", COLORS.white, true))
     for _, suite in ipairs(runResult.suites or {}) do
-        appendSuiteLines(lines, suite, 0)
+        appendSuiteLines(lines, suite, 0, verbose)
     end
 
     table.insert(lines, color("", COLORS.gray))

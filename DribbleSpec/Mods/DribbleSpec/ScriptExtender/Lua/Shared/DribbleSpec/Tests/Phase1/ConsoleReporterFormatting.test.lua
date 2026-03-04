@@ -75,4 +75,21 @@ DribbleSpec.describe("DribbleSpec Console Reporter Formatting", { tags = { "unit
         Assertions.Contains(warningLines[1], "first warning", "first warning content")
         Assertions.Contains(warningLines[2], "second warning", "second warning content")
     end)
+
+    DribbleSpec.test("prints assertion details in verbose mode", function()
+        local run = RunnerHarness.Run(function(dsl)
+            dsl.describe("Verbose suite", function()
+                dsl.test("records assertions", function(ctx)
+                    ctx.expect(1).toBe(1)
+                end)
+            end)
+        end, {
+            verbose = true,
+        })
+
+        local output = table.concat(ConsoleReporter.BuildLines(run), "\n")
+        Assertions.Contains(output, "assertions:", "assertion summary line")
+        Assertions.Contains(output, "toBe", "assertion matcher line")
+        Assertions.Contains(output, "phase=test", "assertion phase")
+    end)
 end)

@@ -25,6 +25,9 @@ local HELP_TOPIC_ALIASES = {
     ["json-out"] = "json-out",
     ["--json-out"] = "json-out",
     ["jsonout"] = "json-out",
+    ["verbose"] = "verbose",
+    ["--verbose"] = "verbose",
+    ["-v"] = "verbose",
 }
 
 ---@param topic string|nil
@@ -75,8 +78,12 @@ function Options.Normalize(options)
     end
 
     normalized.failFast = normalized.failFast == true
+    normalized.verbose = normalized.verbose == true
     normalized.help = normalized.help == true
     normalized.helpTopic = normalizeHelpTopic(normalized.helpTopic)
+    if type(normalized.ownerModuleUUID) ~= "string" or normalized.ownerModuleUUID == "" then
+        normalized.ownerModuleUUID = nil
+    end
     normalized.unknownArgs = normalized.unknownArgs or {}
 
     return normalized
@@ -110,6 +117,8 @@ function Options.ParseArgs(args)
             end
         elseif token == "--fail-fast" then
             options.failFast = true
+        elseif token == "--verbose" or token == "-v" then
+            options.verbose = true
         elseif token == "--name" then
             options.namePattern = tostring(args[i + 1] or "")
             i = i + 1
