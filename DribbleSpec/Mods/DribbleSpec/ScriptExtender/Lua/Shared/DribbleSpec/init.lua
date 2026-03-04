@@ -7,7 +7,6 @@ local Options = Ext.Require("Shared/DribbleSpec/Runner/Options.lua")
 local Clock = Ext.Require("Shared/DribbleSpec/Internal/Clock.lua")
 local Sandbox = Ext.Require("Shared/DribbleSpec/Internal/Sandbox.lua")
 local CallerMod = Ext.Require("Shared/DribbleSpec/Internal/CallerMod.lua")
-local ManifestLoader = Ext.Require("Shared/DribbleSpec/Internal/ManifestLoader.lua")
 local ConsoleIO = Ext.Require("Shared/DribbleSpec/Internal/ConsoleIO.lua")
 local ConsoleReporter = Ext.Require("Shared/DribbleSpec/Reporters/ConsoleReporter.lua")
 local ExecutionRouter = Ext.Require("Shared/DribbleSpec/Runtime/ExecutionRouter.lua")
@@ -35,7 +34,6 @@ local runService = RunService.Create({
     runner = Runner,
     resultModel = ResultModel,
     callerMod = CallerMod,
-    manifestLoader = ManifestLoader,
 })
 
 local serverRunChannel = ServerRunChannel.Create({
@@ -159,11 +157,5 @@ Dribble._internal = {
 
 registerCommand()
 serverRunChannel.RegisterServerRunHandler()
-
-local bootstrapLoaded, bootstrapError = runService.LoadManifest(Options.DEFAULT_MANIFEST_PATH, false)
-if not bootstrapLoaded then
-    ConsoleIO.PrintWarning(string.format("[DribbleSpec] Bootstrap manifest load failed for '%s': %s",
-        tostring(Options.DEFAULT_MANIFEST_PATH), tostring(bootstrapError)))
-end
 
 return Dribble

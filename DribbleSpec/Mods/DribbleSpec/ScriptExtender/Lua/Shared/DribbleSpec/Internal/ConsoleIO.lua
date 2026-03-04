@@ -4,7 +4,6 @@ local HELP_TOPICS = {
     "name",
     "tag",
     "context",
-    "manifest",
     "fail-fast",
     "mod-uuid",
     "json-out",
@@ -20,8 +19,6 @@ local HELP_TOPIC_ALIASES = {
     ["--tag"] = "tag",
     ["context"] = "context",
     ["--context"] = "context",
-    ["manifest"] = "manifest",
-    ["--manifest"] = "manifest",
     ["fail-fast"] = "fail-fast",
     ["--fail-fast"] = "fail-fast",
     ["failfast"] = "fail-fast",
@@ -75,12 +72,10 @@ local function printOverview(printLine)
     printLine("  --tag <tag>                    Require tagged tests; repeat to require all tags (AND)")
     printLine("  --context <client|server|any>  Filter by context tag semantics (default: any)")
     printLine("  --fail-fast                    Stop run after first failure")
-    printLine("  --manifest <path>              Manifest to Ext.Require before execution")
     printLine("  --mod-uuid <uuid>              Caller module UUID for run metadata")
     printLine("  --json-out <path>              Reserved output path for JSON report metadata")
     printLine("")
     printLine("Defaults:")
-    printLine("  --manifest DribbleTests.lua")
     printLine("  --context any")
     printLine("")
     printLine("Topic help:")
@@ -123,15 +118,6 @@ local function printTopicHelp(printLine, topic)
         printLine("  server: include untagged + server-tagged; exclude client-only tagged tests.")
         printLine("  Client sessions requesting --context server route execution to server context.")
         printLine("  Example: dribble --context server")
-        return true
-    end
-
-    if topic == "manifest" then
-        printLine("Topic: manifest")
-        printLine("  Syntax: --manifest <path>")
-        printLine("  Loads the manifest via Ext.Require before running tests.")
-        printLine("  Default: DribbleTests.lua")
-        printLine("  Example: dribble --manifest DribbleTests.lua")
         return true
     end
 

@@ -22,4 +22,11 @@ Dribble.describe("DribbleSpec Phase2 P2.5 help topic parsing", { tags = { "unit"
         Assertions.Equals(options.help, true, "help flag")
         Assertions.Equals(options.helpTopic, nil, "help topic nil")
     end)
+
+    Dribble.test("treats removed manifest option as unknown args", function()
+        local options = Dribble._internal.parseOptions({ "dribble", "--manifest", "MyTests.lua" })
+        Assertions.Equals(#options.unknownArgs, 2, "unknown args count")
+        Assertions.Equals(options.unknownArgs[1], "--manifest", "unknown option")
+        Assertions.Equals(options.unknownArgs[2], "MyTests.lua", "unknown value")
+    end)
 end)

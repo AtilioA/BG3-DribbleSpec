@@ -1,7 +1,5 @@
 local Options = {}
 
-Options.DEFAULT_MANIFEST_PATH = "DribbleTests.lua"
-
 local VALID_CONTEXTS = {
     any = true,
     client = true,
@@ -18,8 +16,6 @@ local HELP_TOPIC_ALIASES = {
     ["--tag"] = "tag",
     ["context"] = "context",
     ["--context"] = "context",
-    ["manifest"] = "manifest",
-    ["--manifest"] = "manifest",
     ["fail-fast"] = "fail-fast",
     ["--fail-fast"] = "fail-fast",
     ["failfast"] = "fail-fast",
@@ -81,7 +77,6 @@ function Options.Normalize(options)
     normalized.failFast = normalized.failFast == true
     normalized.help = normalized.help == true
     normalized.helpTopic = normalizeHelpTopic(normalized.helpTopic)
-    normalized.manifestPath = normalized.manifestPath or Options.DEFAULT_MANIFEST_PATH
     normalized.unknownArgs = normalized.unknownArgs or {}
 
     return normalized
@@ -123,9 +118,6 @@ function Options.ParseArgs(args)
             i = i + 1
         elseif token == "--context" then
             options.context = string.lower(tostring(args[i + 1] or "any"))
-            i = i + 1
-        elseif token == "--manifest" then
-            options.manifestPath = tostring(args[i + 1] or Options.DEFAULT_MANIFEST_PATH)
             i = i + 1
         elseif token == "--mod-uuid" then
             options.callerModuleUUID = tostring(args[i + 1] or "")

@@ -7,39 +7,35 @@ local RunService = {}
 ---@field runner table
 ---@field resultModel table
 ---@field callerMod table
----@field manifestLoader table
+
+---@param snapshot table|nil
+---@return boolean
+local function hasRegisteredSuites(snapshot)
+    if type(snapshot) ~= "table" then
+        return false
+    end
+
+    local suites = snapshot.suites
+    if type(suites) ~= "table" then
+        return false
+    end
+
+    return #suites > 0
+end
 
 ---@param deps DribbleRunServiceDeps
 ---@return table
 function RunService.Create(deps)
-    local loadedManifests = {}
-
-    ---@param manifestPath string
-    ---@param forceReload boolean|nil
-    ---@return boolean loaded
-    ---@return string|nil errorMessage
-    ---@return boolean attempted
-    local function loadManifest(manifestPath, forceReload)
-        if forceReload ~= true and loadedManifests[manifestPath] == true then
-            return true, nil, false
-        end
-
-        local loaded, err = deps.manifestLoader.TryLoad(manifestPath)
-        if loaded then
-            loadedManifests[manifestPath] = true
-        end
-
-        return loaded, err, true
-    end
-
     local service = {}
 
     ---@param options table|nil
     ---@return table
     function service.Run(options)
         local normalized = deps.options.Normalize(options or {})
-        local loaded, manifestError, manifestAttempted = loadManifest(normalized.manifestPath,
-            normalized.reloadManifest == true)
+        local snapshot = nil
+        if deps.registry and type(deps.registry.Snapshot) == "function" then
+            snapshot = deps.registry:Snapshot()
+        end
 
         local runResult = deps.runner.Run({
             registry = deps.registry,
@@ -47,16 +43,9 @@ function RunService.Create(deps)
             clock = deps.clock,
         })
 
-        runResult.manifest = {
-            path = normalized.manifestPath,
-            attempted = manifestAttempted,
-            loaded = loaded,
-            error = manifestError,
-        }
-
-        if manifestAttempted and not loaded then
+        if not hasRegisteredSuites(snapshot) then
             deps.resultModel.AddWarning(runResult,
-                string.format("Manifest not loaded from '%s': %s", tostring(normalized.manifestPath), tostring(manifestError)))
+                "No tests registered; import your test files before running dribble.")
         end
 
         runResult.caller = {
@@ -75,7 +64,6 @@ function RunService.Create(deps)
         return runResult
     end
 
-    service.LoadManifest = loadManifest
     return service
 end
 
