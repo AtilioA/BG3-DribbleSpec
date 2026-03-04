@@ -10,6 +10,7 @@ DribbleSpec is a reusable BG3SE Lua test framework that provides:
 - Runtime helpers (`requireClient`, `requireServer`, `nextTick`, `waitUntil`)
 - Fixture pipeline (preplaced first, spawn fallback)
 - Entity helpers (`entityRef`) and volatile-aware equality
+- IDE helpers (`DribbleIdeHelpers.lua` in `Docs/`)
 
 ## Quick start
 
