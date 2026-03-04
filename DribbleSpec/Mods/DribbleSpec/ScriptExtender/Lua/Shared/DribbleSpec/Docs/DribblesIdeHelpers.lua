@@ -98,4 +98,10 @@ function RegisterTestGlobals(options) end
 
 -- Provide autocomplete if users assign to `D` or use it directly
 ---@type DribbleSpecGlobals
+D = {}
+---@type DribbleSpecGlobals
+Dribble = {}
+---@type DribbleSpecGlobals
+Dribbles = {}
+---@type DribbleSpecGlobals
 DribbleSpec = {}
