@@ -60,7 +60,7 @@ local function runFromArgs(args)
     local options = Options.ParseArgs(args or {})
 
     if options.help then
-        ConsoleIO.PrintHelp(ConsoleIO.PrintLine)
+        ConsoleIO.PrintHelp(ConsoleIO.PrintLine, options.helpTopic)
         return ResultModel.Finalize(ResultModel.NewRun("unknown", options, 0), 0)
     end
 

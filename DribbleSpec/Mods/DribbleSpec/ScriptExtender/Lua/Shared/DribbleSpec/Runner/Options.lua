@@ -8,6 +8,57 @@ local VALID_CONTEXTS = {
     server = true,
 }
 
+local HELP_TOPIC_ALIASES = {
+    ["help"] = "help",
+    ["-h"] = "help",
+    ["--help"] = "help",
+    ["name"] = "name",
+    ["--name"] = "name",
+    ["tag"] = "tag",
+    ["--tag"] = "tag",
+    ["context"] = "context",
+    ["--context"] = "context",
+    ["manifest"] = "manifest",
+    ["--manifest"] = "manifest",
+    ["fail-fast"] = "fail-fast",
+    ["--fail-fast"] = "fail-fast",
+    ["failfast"] = "fail-fast",
+    ["mod-uuid"] = "mod-uuid",
+    ["--mod-uuid"] = "mod-uuid",
+    ["moduuid"] = "mod-uuid",
+    ["json-out"] = "json-out",
+    ["--json-out"] = "json-out",
+    ["jsonout"] = "json-out",
+}
+
+---@param topic string|nil
+---@return string|nil
+local function normalizeHelpTopic(topic)
+    if type(topic) ~= "string" then
+        return nil
+    end
+
+    local normalized = string.lower(topic)
+    normalized = string.match(normalized, "^%s*(.-)%s*$")
+    if normalized == nil or normalized == "" then
+        return nil
+    end
+
+    local alias = HELP_TOPIC_ALIASES[normalized]
+    if alias then
+        return alias
+    end
+
+    if string.sub(normalized, 1, 1) == "-" then
+        local trimmed = string.gsub(normalized, "^-+", "")
+        if trimmed ~= "" then
+            return HELP_TOPIC_ALIASES[trimmed] or trimmed
+        end
+    end
+
+    return normalized
+end
+
 ---@param options table|nil
 ---@return table
 function Options.Normalize(options)
@@ -29,6 +80,7 @@ function Options.Normalize(options)
 
     normalized.failFast = normalized.failFast == true
     normalized.help = normalized.help == true
+    normalized.helpTopic = normalizeHelpTopic(normalized.helpTopic)
     normalized.manifestPath = normalized.manifestPath or Options.DEFAULT_MANIFEST_PATH
     normalized.unknownArgs = normalized.unknownArgs or {}
 
@@ -53,6 +105,11 @@ function Options.ParseArgs(args)
 
         if token == "--help" or token == "-h" then
             options.help = true
+            local topic = normalizeHelpTopic(args[i + 1])
+            if topic ~= nil and topic ~= "help" then
+                options.helpTopic = topic
+                i = i + 1
+            end
         elseif token == "--fail-fast" then
             options.failFast = true
         elseif token == "--name" then

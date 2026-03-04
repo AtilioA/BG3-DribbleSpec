@@ -1,0 +1,25 @@
+local Dribble = _G.Dribble or Ext.Require("Shared/DribbleSpec/init.lua")
+local Assertions = Ext.Require("Shared/DribbleSpec/Tests/Support/Assertions.lua")
+
+Dribble.describe("DribbleSpec Phase2 P2.5 help topic parsing", { tags = { "unit", "phase2", "cli" } }, function()
+    Dribble.test("parses explicit help topic token", function()
+        local options = Dribble._internal.parseOptions({ "dribble", "--help", "tag" })
+        Assertions.Equals(options.help, true, "help flag")
+        Assertions.Equals(options.helpTopic, "tag", "help topic")
+        Assertions.Equals(#options.unknownArgs, 0, "unknown args count")
+    end)
+
+    Dribble.test("normalizes option-like help topic tokens", function()
+        local contextOptions = Dribble._internal.parseOptions({ "dribble", "--help", "--context" })
+        Assertions.Equals(contextOptions.helpTopic, "context", "context help topic")
+
+        local tagOptions = Dribble._internal.parseOptions({ "dribble", "-h", "--tag" })
+        Assertions.Equals(tagOptions.helpTopic, "tag", "tag help topic")
+    end)
+
+    Dribble.test("keeps help topic unset when no topic is provided", function()
+        local options = Dribble._internal.parseOptions({ "dribble", "--help" })
+        Assertions.Equals(options.help, true, "help flag")
+        Assertions.Equals(options.helpTopic, nil, "help topic nil")
+    end)
+end)
