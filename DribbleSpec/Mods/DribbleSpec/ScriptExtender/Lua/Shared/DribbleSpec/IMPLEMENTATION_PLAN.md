@@ -221,6 +221,7 @@ Status (2026-03-03):
 - Phase 6 is complete: fixture manager/provider pipeline, fixture APIs (`ctx.fixture.character/item/entity`), and state snapshot/restore cleanup guarantees are implemented and covered by self-tests.
 - Phase 7 is complete: `EntityRef` lazy re-resolution, entity domain matchers (`toBeGuid`, `toBeEntity`, `toHaveComponent`), and optional `toEqual(..., { volatilePreset = "entity" })` filtering are implemented and covered by self-tests.
 - Phase 8 is complete: consumer UX layer adds centralized public symbol registry and global `RegisterTestGlobals()` table-export entrypoint with consolidated adoption docs.
+- Phase 9 is complete: repo-local `dribblespec` agent skill was added with BG3/DribbleSpec usage guidance, examples, eval prompts, and a script to symlink it into user-global skills.
 - Client runtime dogfood run observed with totals `passed=31 failed=0 skipped=1 total=32`.
 - Server-context execution remains available through NetChannel routing for `--context server` from client sessions.
 
