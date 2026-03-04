@@ -1,5 +1,6 @@
 local Registry = Ext.Require("Shared/DribbleSpec/Core/Registry.lua")
 local ApiBinder = Ext.Require("Shared/DribbleSpec/Core/ApiBinder.lua")
+local PublicSymbols = Ext.Require("Shared/DribbleSpec/Core/PublicSymbols.lua")
 local ResultModel = Ext.Require("Shared/DribbleSpec/Core/ResultModel.lua")
 local Runner = Ext.Require("Shared/DribbleSpec/Runner/Runner.lua")
 local Options = Ext.Require("Shared/DribbleSpec/Runner/Options.lua")
@@ -20,8 +21,8 @@ local EntityRef = Ext.Require("Shared/DribbleSpec/Entity/EntityRef.lua")
 ---@field _PHASE integer
 ---@field _internal table
 local Dribble = {
-    _VERSION = "0.7.0-phase7",
-    _PHASE = 7,
+    _VERSION = "0.8.0-phase8",
+    _PHASE = 8,
 }
 
 _G.Dribble = Dribble
@@ -104,7 +105,7 @@ local function registerCommand()
 end
 
 local function notAvailable(name)
-    error(string.format("DribbleSpec Phase 6: '%s' is not implemented yet.", name), 2)
+    error(string.format("DribbleSpec Phase 8: '%s' is not implemented yet.", name), 2)
 end
 
 ApiBinder.Bind(Dribble, registry)
@@ -113,6 +114,28 @@ Dribble.Run = runService.Run
 Dribble.RunFromArgs = runFromArgs
 Dribble.expect = Expect.Expect
 Dribble.entityRef = EntityRef.Create
+local function registerTestGlobals(options)
+    if options ~= nil then
+        error("RegisterTestGlobals() does not accept arguments", 2)
+    end
+
+    local symbols = PublicSymbols.Resolve(Dribble)
+    local exported = {}
+    for _, symbolName in ipairs(PublicSymbols.Keys()) do
+        exported[symbolName] = symbols[symbolName]
+    end
+
+    return exported
+end
+
+Dribble.RegisterTestGlobals = registerTestGlobals
+
+RegisterTestGlobals = registerTestGlobals
+
+local globalRegisterTestGlobals = registerTestGlobals
+
+rawset(_G, "RegisterTestGlobals", globalRegisterTestGlobals)
+
 Dribble.ResetRegistry = function()
     registry:Clear()
 end

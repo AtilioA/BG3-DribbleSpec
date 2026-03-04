@@ -264,6 +264,10 @@ DribbleSpec must remain mod-agnostic:
 - only BG3SE runtime primitives (`Ext`, `Osi`) and DribbleSpec APIs;
 - consumer mods opt in by loading DribbleSpec and registering tests.
 
+Consumer namespace convenience:
+- DribbleSpec exposes global `RegisterTestGlobals()`.
+- `RegisterTestGlobals()` returns a table of test globals so consumer mods can assign it to their own namespace (eg. `Mods.Dribbles = RegisterTestGlobals()`).
+
 ## 10) Example Consumer Usage
 
 ```lua

@@ -1,6 +1,6 @@
 {
     "RequiredVersion": 30,
-    "ModTable": "DribbleSpec",
+    "ModTable": "Dribbles",
     "FeatureFlags": [
         "Lua"
     ]

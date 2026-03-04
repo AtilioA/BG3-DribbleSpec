@@ -127,17 +127,23 @@ Exit criteria:
 ### Phase 8 - Consumer UX and Adoption Docs
 
 Goal:
-- Easy adoption by external mods.
+- Extremely easy adoption by external mods.
 
 Scope:
-- Integration docs using explicit `DribbleTests.lua` include model.
-- Example suites for unit/runtime/entity modes.
-- Packaging guidance for dependency mods.
+- Markdown integration docs.
+- Packaging guidance for dependency mods. They should be able to call a single function to register namespace into their globals table.
+- Example suites for unit/runtime/entity modes. Include examples for every use case supported by DribbleSpec, as well as examples of how to extend DribbleSpec to support new use cases and tailor it to specific mod needs.
 
 Exit criteria:
 - Clean start-to-finish integration walkthrough exists.
 
-### Phase 9 - JSON Reporter (Lowest Priority)
+### Phase 9 - Agent Skill
+
+Use the skill-creator skill to create a skill to inform LLM agents on how to use DribbleSpec. Include examples of how to import and use DribbleSpec to test a mod, how to create a test file, how to run the tests.
+Make sure to add examples to how to integrate with BG3 domain, i.e. how to use it for entities, handle BG3SE lifetime, etc.
+This should reuse a lot of the documentation from Phase 8, but tailoring it and its examples, succintly, for LLM agents.
+
+### Phase 10 - JSON Reporter (Lowest Priority)
 
 Goal:
 - CI artifact output.
@@ -148,6 +154,8 @@ Scope:
 - Default output path:
   - `DribbleSpec/<caller_modname>/results_<file-safe_ISO8601_timestamp>.json`
 - `--json-out` override.
+
+---
 
 Exit criteria:
 - Reporter output and failure behavior covered by self-tests.
@@ -212,6 +220,7 @@ Status (2026-03-03):
 - Phase 5 is complete: runtime helpers (`ctx.requireClient`, `ctx.requireServer`, `ctx.nextTick`, `ctx.waitUntil`) are implemented with deterministic fallback guardrails covered by self-tests.
 - Phase 6 is complete: fixture manager/provider pipeline, fixture APIs (`ctx.fixture.character/item/entity`), and state snapshot/restore cleanup guarantees are implemented and covered by self-tests.
 - Phase 7 is complete: `EntityRef` lazy re-resolution, entity domain matchers (`toBeGuid`, `toBeEntity`, `toHaveComponent`), and optional `toEqual(..., { volatilePreset = "entity" })` filtering are implemented and covered by self-tests.
+- Phase 8 is complete: consumer UX layer adds centralized public symbol registry and global `RegisterTestGlobals()` table-export entrypoint with consolidated adoption docs.
 - Client runtime dogfood run observed with totals `passed=31 failed=0 skipped=1 total=32`.
 - Server-context execution remains available through NetChannel routing for `--context server` from client sessions.
 
