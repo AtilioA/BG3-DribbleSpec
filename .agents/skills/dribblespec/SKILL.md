@@ -39,7 +39,9 @@ local D = RegisterTestGlobals()
 3. Write tests via public API (`D.describe`, `D.test`, hooks, `ctx` helpers).
 4. Run targeted tests first (`--name` or `--tag`) then broader run.
 5. Fix failures through behavior assertions, not internal implementation coupling.
-6. Keep runtime/entity tests context-safe (`ctx.requireClient` / `ctx.requireServer`).
+6. Prefer DribbleSpec doubles (`ctx.stub`, `ctx.spyOn`, `ctx.mockFn`) over manual backup/restore patching in tests.
+7. In DribbleSpec tests, do not guard with `type(...skip) == "function"`.
+8. Keep runtime/entity tests context-safe (`ctx.requireClient` / `ctx.requireServer`).
 
 Use vertical TDD slices when implementing features or bugfixes.
 
