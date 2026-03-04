@@ -19,6 +19,8 @@ DribbleSpec.describe("DribbleSpec Phase7 P7.3 toBeUuid", { tags = { "unit", "pha
     end)
 
     DribbleSpec.test("toBeUuid rejects non-uuid values", function()
+        DribbleSpec.expect("not-a-uuid").Not.toBeUuid()
+
         local errInvalidString = captureError(function()
             DribbleSpec.expect("not-a-uuid").toBeUuid()
         end)

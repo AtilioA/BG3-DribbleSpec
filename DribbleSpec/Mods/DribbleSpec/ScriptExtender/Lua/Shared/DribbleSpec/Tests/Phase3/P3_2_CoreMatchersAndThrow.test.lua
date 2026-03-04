@@ -72,4 +72,24 @@ DribbleSpec.describe("DribbleSpec Phase3 P3.2 core matchers", { tags = { "unit",
         end)
         Assertions.Contains(throwMatchErr, "toThrowMatch", "toThrowMatch matcher label")
     end)
+
+    DribbleSpec.test("supports Not expectation chain", function()
+        DribbleSpec.expect(1).Not.toBe(2)
+        DribbleSpec.expect("alpha beta").Not.toContain("delta")
+        DribbleSpec.expect(function()
+            return 1
+        end).Not.toThrow()
+
+        local notToBeErr = captureError(function()
+            DribbleSpec.expect(1).Not.toBe(1)
+        end)
+        Assertions.Contains(notToBeErr, "not.toBe", "not.toBe matcher label")
+
+        local notToThrowErr = captureError(function()
+            DribbleSpec.expect(function()
+                error("boom")
+            end).Not.toThrow()
+        end)
+        Assertions.Contains(notToThrowErr, "not.toThrow", "not.toThrow matcher label")
+    end)
 end)

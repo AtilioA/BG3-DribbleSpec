@@ -32,7 +32,7 @@
 ---@field toHaveComponent fun(componentName: string)
 
 ---@class DribbleSpecExpectation : DribbleSpecExpectationModifier
----@field Not DribbleSpecExpectationModifier Negates the expectation
+---@field Not DribbleSpecExpectationModifier Negates the expectation (dot syntax friendly; `not` is a reserved keyword)
 
 ---@class DribbleSpecFixtureStateApi
 ---@field snapshot fun(options: table): DribbleSpecFixtureSnapshot

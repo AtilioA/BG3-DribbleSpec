@@ -42,26 +42,47 @@ end
 ---@param matcherName string
 ---@param actual any
 ---@param matcher function
+---@param negate boolean|nil
 ---@return function
-local function wrapMatcher(matcherName, actual, matcher)
+local function wrapMatcher(matcherName, actual, matcher, negate)
     return function(...)
-        if type(assertionObserver) ~= "function" then
-            return matcher(...)
+        local wrappedMatcherName = matcherName
+        if negate == true then
+            wrappedMatcherName = "not." .. matcherName
         end
 
         local argCount = select("#", ...)
         local args = { ... }
+
+        local function executeMatcher()
+            if negate == true then
+                local okInner = pcall(function()
+                    matcher(table.unpack(args, 1, argCount))
+                end)
+                if okInner then
+                    fail(wrappedMatcherName, string.format("expected matcher '%s' to fail", matcherName))
+                end
+                return
+            end
+
+            matcher(table.unpack(args, 1, argCount))
+        end
+
+        if type(assertionObserver) ~= "function" then
+            return executeMatcher()
+        end
+
         local expected = nil
         if argCount > 0 then
             expected = renderValue(args[1])
         end
 
         local ok, err = pcall(function()
-            matcher(table.unpack(args, 1, argCount))
+            executeMatcher()
         end)
         if ok then
             emitAssertion({
-                matcher = matcherName,
+                matcher = wrappedMatcherName,
                 status = "passed",
                 actual = renderValue(actual),
                 expected = expected,
@@ -70,7 +91,7 @@ local function wrapMatcher(matcherName, actual, matcher)
         end
 
         emitAssertion({
-            matcher = matcherName,
+            matcher = wrappedMatcherName,
             status = "failed",
             actual = renderValue(actual),
             expected = expected,
@@ -314,7 +335,7 @@ end
 ---@param actual any
 ---@return table
 function Expect.Create(actual)
-    local matchers = {
+    local matcherDefinitions = {
         toBe = function(expected)
             if actual ~= expected then
                 fail("toBe", string.format("expected=%s actual=%s", tostring(expected), tostring(actual)))
@@ -470,11 +491,24 @@ function Expect.Create(actual)
         end,
     }
 
-    for matcherName, matcher in pairs(matchers) do
-        if type(matcher) == "function" then
-            matchers[matcherName] = wrapMatcher(matcherName, actual, matcher)
+    local function buildMatcherSet(negate)
+        local wrapped = {}
+        for matcherName, matcher in pairs(matcherDefinitions) do
+            if type(matcher) == "function" then
+                wrapped[matcherName] = wrapMatcher(matcherName, actual, matcher, negate)
+            end
         end
+
+        return wrapped
     end
+
+    local matchers = buildMatcherSet(false)
+    local negatedMatchers = buildMatcherSet(true)
+
+    matchers["not"] = negatedMatchers
+    matchers.Not = negatedMatchers
+    negatedMatchers["not"] = matchers
+    negatedMatchers.Not = matchers
 
     return matchers
 end
