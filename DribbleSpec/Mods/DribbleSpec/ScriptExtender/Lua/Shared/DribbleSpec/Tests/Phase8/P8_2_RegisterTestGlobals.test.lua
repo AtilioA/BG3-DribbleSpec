@@ -18,7 +18,6 @@ Dribble.describe("DribbleSpec Phase8 P8.2 RegisterTestGlobals", { tags = { "unit
             Assertions.Equals(type(target.afterAll), "function", "afterAll exposed")
             Assertions.Equals(type(target.expect), "function", "expect exposed")
             Assertions.Equals(type(target.entityRef), "function", "entityRef exposed")
-            Assertions.Equals(type(target.RunFromArgs), "function", "RunFromArgs exposed")
             Assertions.Equals(type(target.RegisterTestGlobals), "function", "RegisterTestGlobals exposed")
         end)
 

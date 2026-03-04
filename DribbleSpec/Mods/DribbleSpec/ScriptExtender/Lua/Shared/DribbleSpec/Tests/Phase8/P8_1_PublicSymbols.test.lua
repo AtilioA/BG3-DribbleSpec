@@ -31,8 +31,6 @@ Dribble.describe("DribbleSpec Phase8 P8.1 public symbol registry", { tags = { "u
                 "afterAll",
                 "expect",
                 "entityRef",
-                "Run",
-                "RunFromArgs",
             }) do
                 if not contains(keys, symbolName) then
                     error(string.format("missing symbol key '%s'", tostring(symbolName)))
@@ -49,7 +47,5 @@ Dribble.describe("DribbleSpec Phase8 P8.1 public symbol registry", { tags = { "u
             Assertions.Equals(symbols.it, Dribble.it, "it symbol")
             Assertions.Equals(symbols.expect, Dribble.expect, "expect symbol")
             Assertions.Equals(symbols.entityRef, Dribble.entityRef, "entityRef symbol")
-            Assertions.Equals(symbols.Run, Dribble.Run, "Run symbol")
-            Assertions.Equals(symbols.RunFromArgs, Dribble.RunFromArgs, "RunFromArgs symbol")
         end)
     end)

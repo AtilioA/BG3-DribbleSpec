@@ -66,18 +66,6 @@ local SYMBOL_DEFINITIONS = {
             return api.entityRef
         end,
     },
-    {
-        name = "Run",
-        resolver = function(api)
-            return api.Run
-        end,
-    },
-    {
-        name = "RunFromArgs",
-        resolver = function(api)
-            return api.RunFromArgs
-        end,
-    },
 }
 
 ---@return string[]
