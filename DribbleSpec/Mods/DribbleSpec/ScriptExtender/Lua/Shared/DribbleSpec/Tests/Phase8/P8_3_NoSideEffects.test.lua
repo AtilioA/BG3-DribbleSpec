@@ -27,15 +27,19 @@ DribbleSpec.describe("DribbleSpec Phase8 P8.3 RegisterTestGlobals side effects",
         end)
 
         DribbleSpec.test("RegisterTestGlobals commandAlias registers once", function()
-            local originalRegisterConsoleCommand = Ext.RegisterConsoleCommand
-            local registrations = {}
             local originalAliasRegistry = rawget(_G, "__DRIBBLESPEC_CONSUMER_COMMAND_ALIASES")
 
             local ok, err = xpcall(function()
                 rawset(_G, "__DRIBBLESPEC_CONSUMER_COMMAND_ALIASES", nil)
-                Ext.RegisterConsoleCommand = function(name, handler)
-                    registrations[name] = handler
-                end
+
+                RegisterTestGlobals({
+                    ownerModuleUUID = "module-a",
+                    commandAlias = "mytests",
+                })
+
+                local aliasRegistry = rawget(_G, "__DRIBBLESPEC_CONSUMER_COMMAND_ALIASES")
+                Assertions.Equals(type(aliasRegistry), "table", "alias registry created")
+                Assertions.Equals(aliasRegistry.mytests, "module-a", "alias owner set")
 
                 RegisterTestGlobals({
                     ownerModuleUUID = "module-a",
@@ -43,19 +47,18 @@ DribbleSpec.describe("DribbleSpec Phase8 P8.3 RegisterTestGlobals side effects",
                 })
 
                 RegisterTestGlobals({
-                    ownerModuleUUID = "module-a",
+                    ownerModuleUUID = "module-b",
                     commandAlias = "mytests",
                 })
 
-                Assertions.Equals(type(registrations.mytests), "function", "command alias handler")
                 local registrationCount = 0
-                for _ in pairs(registrations) do
+                for _ in pairs(aliasRegistry) do
                     registrationCount = registrationCount + 1
                 end
                 Assertions.Equals(registrationCount, 1, "single alias registration")
+                Assertions.Equals(aliasRegistry.mytests, "module-a", "first owner preserved")
             end, debug.traceback)
 
-            Ext.RegisterConsoleCommand = originalRegisterConsoleCommand
             rawset(_G, "__DRIBBLESPEC_CONSUMER_COMMAND_ALIASES", originalAliasRegistry)
 
             if not ok then
