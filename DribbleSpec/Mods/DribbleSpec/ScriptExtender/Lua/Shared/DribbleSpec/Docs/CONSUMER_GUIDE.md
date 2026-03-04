@@ -21,6 +21,21 @@ DribbleSpec is a reusable BG3SE Lua test framework that provides:
 local D = RegisterTestGlobals()
 ```
 
+You can configure one-time defaults for your mod:
+
+```lua
+local D = RegisterTestGlobals({
+    ownerModuleUUID = ModuleUUID,
+    globalTags = { "mymod" },
+    commandAlias = "mytests",
+})
+
+This will:
+1. Register a console command `!mytests` that runs only your mod tests
+2. Tag all your tests with `mymod` so they can be filtered by `dribbles --tag mymod`.
+
+```
+
 This returns a symbol table with all relevant exports.
 
 ## Exported symbols
@@ -38,6 +53,7 @@ After `RegisterTestGlobals()`, these symbols are available on the returned table
 - `expect`
 - `entityRef`
 - `skip`
+- `RunMine`
 
 `RegisterTestGlobals()` only returns a table of exports. Your mod decides where to assign it (`D`, `Dribbles`, local variable, etc.).
 
@@ -66,12 +82,16 @@ Ext.Require("Shared/MyMod/Tests/Runtime.test.lua")
 
 Use DribbleSpec console command:
 
-- run all: `dribbles`
+- run all loaded tests: `dribbles` (or shorthand `d`)
 - help: `dribbles --help`
 - name filter: `dribbles --name "migration"`
 - tag filter: `dribbles --tag runtime --tag server`
 - context: `dribbles --context server`
 - fail fast: `dribbles --fail-fast`
+
+If you set `commandAlias` in `RegisterTestGlobals`, use that alias to run only your mod-owned tests:
+
+- run only this mod: `mytests`
 
 ## Skipping tests
 

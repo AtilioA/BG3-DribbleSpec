@@ -5,7 +5,6 @@ local ResultModel = Ext.Require("Shared/DribbleSpec/Core/ResultModel.lua")
 local Runner = Ext.Require("Shared/DribbleSpec/Runner/Runner.lua")
 local Options = Ext.Require("Shared/DribbleSpec/Runner/Options.lua")
 local Clock = Ext.Require("Shared/DribbleSpec/Internal/Clock.lua")
-local CallerMod = Ext.Require("Shared/DribbleSpec/Internal/CallerMod.lua")
 local RunService = Ext.Require("Shared/DribbleSpec/Runtime/RunService.lua")
 
 ---@return table
@@ -16,7 +15,6 @@ local function createRunServiceWithRegistry(registry)
         clock = Clock,
         runner = Runner,
         resultModel = ResultModel,
-        callerMod = CallerMod,
     })
 end
 

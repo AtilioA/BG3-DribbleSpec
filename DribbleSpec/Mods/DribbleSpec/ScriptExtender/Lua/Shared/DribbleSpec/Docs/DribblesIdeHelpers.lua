@@ -82,12 +82,19 @@
 ---@field expect fun(actual: any): DribbleSpecExpectation Creates an expectation for the given value
 ---@field entityRef fun(source: any): table Retrieves a stable entity reference
 ---@field skip fun(reason?: string) Throws a SkipSignal to bypass execution
----@field RegisterTestGlobals fun(): DribbleSpecGlobals Returns the DribbleSpec API symbols
+---@field RunMine fun(options?: table): table Runs tests filtered to the registered owner module
+---@field RegisterTestGlobals fun(options?: DribbleSpecRegisterOptions): DribbleSpecGlobals Returns the DribbleSpec API symbols
+
+---@class DribbleSpecRegisterOptions
+---@field ownerModuleUUID? string Defaults to current `ModuleUUID` when available
+---@field globalTags? string[] Appended to every `describe/test` metadata tags array
+---@field commandAlias? string Optional extra console command that runs this mod's tests only
 
 --- RegisterTestGlobals is the primary entrypoint for consumers.
---- Suggested usage: `D = RegisterTestGlobals()`
+--- Suggested usage: `D = RegisterTestGlobals({ commandAlias = "mytests" })`
+---@param options? DribbleSpecRegisterOptions
 ---@return DribbleSpecGlobals
-function RegisterTestGlobals() end
+function RegisterTestGlobals(options) end
 
 -- Provide autocomplete if users assign to `D` or use it directly
 ---@type DribbleSpecGlobals

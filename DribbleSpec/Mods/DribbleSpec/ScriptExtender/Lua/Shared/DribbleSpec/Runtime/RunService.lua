@@ -6,7 +6,6 @@ local RunService = {}
 ---@field clock table
 ---@field runner table
 ---@field resultModel table
----@field callerMod table
 
 ---@param snapshot table|nil
 ---@return boolean
@@ -46,19 +45,6 @@ function RunService.Create(deps)
         if not hasRegisteredSuites(snapshot) then
             deps.resultModel.AddWarning(runResult,
                 "No tests registered; import your test files before running dribbles.")
-        end
-
-        runResult.caller = {
-            moduleUUID = normalized.callerModuleUUID,
-            name = nil,
-        }
-
-        if normalized.callerModuleUUID then
-            local callerName, warning = deps.callerMod.ResolveName(normalized.callerModuleUUID)
-            runResult.caller.name = callerName
-            if warning then
-                deps.resultModel.AddWarning(runResult, warning)
-            end
         end
 
         return runResult

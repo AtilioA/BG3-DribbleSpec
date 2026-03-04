@@ -35,4 +35,34 @@ DribbleSpec.describe("DribbleSpec Phase2 P2.2 tag filtering", { tags = { "unit",
         Assertions.Equals(#suite.tests, 1, "selected tests count")
         Assertions.Equals(suite.tests[1].name, "full match", "selected test")
     end)
+
+    DribbleSpec.test("filters tests by ownerModuleUUID metadata when provided", function()
+        local trace = {}
+
+        local run = RunnerHarness.Run(function(dsl)
+            dsl.describe("mod A suite", { ownerModuleUUID = "mod-a" }, function()
+                dsl.test("mod A test", function()
+                    table.insert(trace, "mod-a")
+                end)
+            end)
+
+            dsl.describe("mod B suite", { ownerModuleUUID = "mod-b" }, function()
+                dsl.test("mod B test", function()
+                    table.insert(trace, "mod-b")
+                end)
+            end)
+        end, {
+            ownerModuleUUID = "mod-b",
+        })
+
+        Assertions.Equals(run.status, "passed", "run status")
+        Assertions.Equals(run.summary.passed, 1, "passed count")
+        Assertions.Equals(run.summary.failed, 0, "failed count")
+        Assertions.Equals(run.summary.skipped, 0, "skipped count")
+        Assertions.Equals(run.summary.total, 1, "total count")
+        Assertions.Equals(table.concat(trace, "|"), "mod-b", "executed tests")
+        Assertions.Equals(#run.suites, 1, "selected suite count")
+        Assertions.Equals(run.suites[1].name, "mod B suite", "selected suite name")
+        Assertions.Equals(run.suites[1].tests[1].name, "mod B test", "selected test name")
+    end)
 end)

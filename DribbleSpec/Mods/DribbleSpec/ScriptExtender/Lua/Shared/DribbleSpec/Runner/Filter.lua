@@ -31,6 +31,26 @@ local function collectTagSet(lineage, test)
     return tagSet
 end
 
+---@param lineage table[]|nil
+---@param test table|nil
+---@return string|nil
+local function collectOwnerModuleUUID(lineage, test)
+    if type(test) == "table" and type(test.metadata) == "table" and type(test.metadata.ownerModuleUUID) == "string" and
+        test.metadata.ownerModuleUUID ~= "" then
+        return test.metadata.ownerModuleUUID
+    end
+
+    for i = #(lineage or {}), 1, -1 do
+        local suite = lineage[i]
+        if type(suite) == "table" and type(suite.metadata) == "table" and type(suite.metadata.ownerModuleUUID) == "string" and
+            suite.metadata.ownerModuleUUID ~= "" then
+            return suite.metadata.ownerModuleUUID
+        end
+    end
+
+    return nil
+end
+
 ---@param pattern string
 ---@param fullName string
 ---@return boolean
@@ -97,6 +117,11 @@ function Filter.Create(options)
         context = string.lower(normalized.context)
     end
 
+    local ownerModuleUUID = nil
+    if type(normalized.ownerModuleUUID) == "string" and normalized.ownerModuleUUID ~= "" then
+        ownerModuleUUID = normalized.ownerModuleUUID
+    end
+
     local filter = {}
 
     ---@param lineage table[]|nil
@@ -114,6 +139,13 @@ function Filter.Create(options)
 
         if not matchesContext(context, tagSet) then
             return false
+        end
+
+        if ownerModuleUUID ~= nil then
+            local testOwnerModuleUUID = collectOwnerModuleUUID(lineage, test)
+            if testOwnerModuleUUID ~= ownerModuleUUID then
+                return false
+            end
         end
 
         return true

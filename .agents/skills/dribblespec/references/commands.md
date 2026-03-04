@@ -8,7 +8,7 @@
 - Tag filter (AND): `dribbles --tag runtime --tag server`
 - Context filter: `dribbles --context client`
 - Fail fast: `dribbles --fail-fast`
-- With caller UUID metadata: `dribbles --mod-uuid 00000000-0000-0000-0000-000000000000`
+- Consumer alias run, if `commandAlias` is defined in RegisterTestGlobals.
 - Reserved JSON path metadata: `dribbles --json-out DribbleSpec/results.json`
 
 ## Suggested execution order
