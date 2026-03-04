@@ -1,6 +1,4 @@
-# DribbleSpec Consumer Guide
-
-This is the single integration guide for consumer mods.
+# DribbleSpec Guide
 
 ## What DribbleSpec provides
 
@@ -13,7 +11,7 @@ DribbleSpec is a reusable BG3SE Lua test framework that provides:
 - Fixture pipeline (preplaced first, spawn fallback)
 - Entity helpers (`entityRef`) and volatile-aware equality
 
-## Consumer quick start
+## Quick start
 
 1. Ensure DribbleSpec is loaded in your mod load order.
 2. Call `RegisterTestGlobals()` and assign the returned table to your namespace:
@@ -22,7 +20,7 @@ DribbleSpec is a reusable BG3SE Lua test framework that provides:
 local D = RegisterTestGlobals()
 ```
 
-This returns a symbol table; DribbleSpec does not mutate consumer namespaces.
+This returns a symbol table with all relevant exports.
 
 ## Exported symbols
 
@@ -38,12 +36,8 @@ After `RegisterTestGlobals()`, these symbols are available on the returned table
 - `afterAll`
 - `expect`
 - `entityRef`
-- `Run`
-- `RunFromArgs`
 
-## Consumer ownership
-
-DribbleSpec only returns a table of exports. Your mod decides where to assign it (`Mods.Dribbles`, local variable, etc.).
+`RegisterTestGlobals()` only returns a table of exports. Your mod decides where to assign it (`D`, `Dribbles`, local variable, etc.).
 
 ## Minimal test file example
 
