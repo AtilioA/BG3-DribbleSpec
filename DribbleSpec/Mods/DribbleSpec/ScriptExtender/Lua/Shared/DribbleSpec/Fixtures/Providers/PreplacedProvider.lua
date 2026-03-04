@@ -61,12 +61,12 @@ local function resolveValue(descriptor, context)
     end
 
     local guid = descriptor.guid or descriptor.uuid or descriptor.entityGuid
-    if type(guid) == "string" and guid ~= "" and type(Ext) == "table" and type(Ext.Entity) == "table" and type(Ext.Entity.Get) == "function" then
+    if type(guid) == "string" and guid ~= "" then
         return Ext.Entity.Get(guid)
     end
 
     local netId = descriptor.netId
-    if type(netId) == "number" and type(Ext) == "table" and type(Ext.Entity) == "table" and type(Ext.Entity.Get) == "function" then
+    if type(netId) == "number" then
         return Ext.Entity.Get(netId)
     end
 

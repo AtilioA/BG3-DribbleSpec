@@ -27,20 +27,12 @@ end
 
 ---@return function|nil
 local function resolveOnNextTick()
-    if type(Ext) == "table" and type(Ext.OnNextTick) == "function" then
-        return Ext.OnNextTick
-    end
-
-    return nil
+    return Ext.OnNextTick
 end
 
 ---@return function|nil
 local function resolveWaitFor()
-    if type(Ext) == "table" and type(Ext.Timer) == "table" and type(Ext.Timer.WaitFor) == "function" then
-        return Ext.Timer.WaitFor
-    end
-
-    return nil
+    return Ext.Timer.WaitFor
 end
 
 ---@param params DribbleRuntimeHelpersParams|nil

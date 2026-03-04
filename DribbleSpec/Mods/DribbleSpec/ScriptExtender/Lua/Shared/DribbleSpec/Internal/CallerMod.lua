@@ -8,10 +8,6 @@ function CallerMod.ResolveName(moduleUUID)
         return "UnknownMod", "Caller module UUID not provided"
     end
 
-    if type(Ext) ~= "table" or type(Ext.Mod) ~= "table" or type(Ext.Mod.GetMod) ~= "function" then
-        return "UnknownMod", "Ext.Mod.GetMod unavailable"
-    end
-
     local mod = Ext.Mod.GetMod(moduleUUID)
     if not mod or type(mod.Info) ~= "table" or type(mod.Info.Name) ~= "string" or mod.Info.Name == "" then
         return "UnknownMod", "No mod info found for module UUID: " .. moduleUUID

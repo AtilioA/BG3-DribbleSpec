@@ -1,0 +1,29 @@
+{
+  "skill_name": "dribblespec",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Set up a new DribbleSpec test file for my BG3 mod and give me a minimal smoke suite.",
+      "expected_output": "Creates a Lua test file that uses local D = RegisterTestGlobals() and defines a passing describe/test suite.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "Migrate my old tests to DribbleSpec. Update to the current contract and keep behavior the same.",
+      "expected_output": "Rewrites test setup to use DribbleSpec APIs, RegisterTestGlobals(), describe/test/expect, fixtures, entity tests, etc.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "My entity test using DisplayName fails on client because of entity shape differences. Refactor to run on server.",
+      "expected_output": "Uses server context gating for DisplayName checks, includes context-appropriate command examples, and keeps test deterministic.",
+      "files": []
+    },
+    {
+      "id": 4,
+      "prompt": "Write a DribbleSpec runtime test that uses fixtures and state snapshot restore, and explain how to run only that test by tag and by name.",
+      "expected_output": "Provides fixture-based test with snapshot/restore, then both --tag and --name execution commands.",
+      "files": []
+    }
+  ]
+}

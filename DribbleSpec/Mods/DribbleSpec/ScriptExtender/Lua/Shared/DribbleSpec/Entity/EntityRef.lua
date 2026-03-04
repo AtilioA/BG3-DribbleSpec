@@ -6,14 +6,6 @@
 local EntityRef = {}
 EntityRef.__index = EntityRef
 
----@param value any
----@return boolean
-local function hasEntityApi()
-    return type(Ext) == "table"
-        and type(Ext.Entity) == "table"
-        and type(Ext.Entity.Get) == "function"
-end
-
 ---@param entity any
 ---@param key string
 ---@return any
@@ -165,10 +157,6 @@ function EntityRef:Resolve()
         if ok and value ~= nil then
             return value
         end
-    end
-
-    if not hasEntityApi() then
-        return nil
     end
 
     if type(self._guid) == "string" and self._guid ~= "" then

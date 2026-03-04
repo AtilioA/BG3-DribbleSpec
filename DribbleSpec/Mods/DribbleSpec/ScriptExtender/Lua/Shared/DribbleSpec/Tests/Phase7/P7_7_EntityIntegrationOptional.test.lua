@@ -9,14 +9,6 @@ Dribble.describe("DribbleSpec Phase7 P7.7 optional entity integration", {
     Dribble.test("entity domain matchers work with a known preplaced entity when available", function(ctx)
         ctx.requireServer()
 
-        local hasEntityApi = type(Ext) == "table"
-            and type(Ext.Entity) == "table"
-            and type(Ext.Entity.Get) == "function"
-
-        if not hasEntityApi then
-            SkipSignal.Throw("Optional integration skipped: Ext.Entity.Get is unavailable")
-        end
-
         local probe = Ext.Entity.Get(GUID_SHADOWHEART)
         if probe == nil then
             SkipSignal.Throw("Optional integration skipped: known preplaced GUID not available in current runtime")

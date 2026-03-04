@@ -150,24 +150,12 @@ end
 
 ---@param message string
 function ConsoleIO.PrintLine(message)
-    if type(Ext) == "table" and type(Ext.Utils) == "table" and type(Ext.Utils.Print) == "function" then
-        Ext.Utils.Print(message)
-        return
-    end
-
-    if type(print) == "function" then
-        print(message)
-    end
+    Ext.Utils.Print(message)
 end
 
 ---@param message string
 function ConsoleIO.PrintWarning(message)
-    if type(Ext) == "table" and type(Ext.Utils) == "table" and type(Ext.Utils.PrintWarning) == "function" then
-        Ext.Utils.PrintWarning(message)
-        return
-    end
-
-    ConsoleIO.PrintLine(message)
+    Ext.Utils.PrintWarning(message)
 end
 
 ---@param printLine fun(message: string)

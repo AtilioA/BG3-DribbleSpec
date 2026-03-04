@@ -42,13 +42,9 @@ local serverRunChannel = ServerRunChannel.Create({
     runLocal = runService.Run,
     printWarning = ConsoleIO.PrintWarning,
     isServer = function()
-        return type(Ext) == "table" and type(Ext.IsServer) == "function" and Ext.IsServer() == true
+        return Ext.IsServer() == true
     end,
     createChannel = function(moduleUUID, channelName)
-        if type(Ext) ~= "table" or type(Ext.Net) ~= "table" or type(Ext.Net.CreateChannel) ~= "function" then
-            return nil
-        end
-
         return Ext.Net.CreateChannel(moduleUUID, channelName)
     end,
 })
@@ -65,7 +61,7 @@ local function runFromArgs(args)
 
     return ExecutionRouter.Run(options, {
         isClient = function()
-            return type(Ext) == "table" and type(Ext.IsClient) == "function" and Ext.IsClient() == true
+            return Ext.IsClient() == true
         end,
         requestServerRun = serverRunChannel.RequestServerRun,
         runLocal = runService.Run,
@@ -88,10 +84,6 @@ end
 
 local function registerCommand()
     if rawget(_G, "__DRIBBLESPEC_COMMAND_REGISTERED") then
-        return
-    end
-
-    if type(Ext) ~= "table" or type(Ext.RegisterConsoleCommand) ~= "function" then
         return
     end
 

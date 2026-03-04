@@ -214,15 +214,11 @@ end
 
 ---@return string
 function Runner.DetectContext()
-    if type(Ext) ~= "table" then
-        return "unknown"
-    end
-
-    if type(Ext.IsClient) == "function" and Ext.IsClient() then
+    if Ext.IsClient() then
         return "client"
     end
 
-    if type(Ext.IsServer) == "function" and Ext.IsServer() then
+    if Ext.IsServer() then
         return "server"
     end
 
