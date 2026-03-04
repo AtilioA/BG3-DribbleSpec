@@ -382,9 +382,9 @@ function Expect.Create(actual)
                 fail("toEqual", Diff.FromMismatch(detail))
             end
         end,
-        toBeGuid = function()
+        toBeUuid = function()
             if not isGuid(actual) then
-                fail("toBeGuid", string.format("expected GUID string, actual=%s", renderValue(actual)))
+                fail("toBeUuid", string.format("expected UUID string, actual=%s", renderValue(actual)))
             end
         end,
         toBeEntity = function()

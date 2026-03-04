@@ -14,7 +14,7 @@ DribbleSpec.describe("DribbleSpec Phase7 P7.7 optional entity integration", {
             SkipSignal.Throw("Optional integration skipped: known preplaced GUID not available in current runtime")
         end
 
-        ctx.expect(GUID_SHADOWHEART).toBeGuid()
+        ctx.expect(GUID_SHADOWHEART).toBeUuid()
         ctx.expect(probe).toBeEntity()
         ctx.expect(probe).toHaveComponent("DisplayName")
 

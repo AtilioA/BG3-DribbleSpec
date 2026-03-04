@@ -88,7 +88,7 @@ Error matchers:
 - `expect(fn).toThrowMatch(pattern)`
 
 BG3 domain matchers:
-- `expect(value).toBeGuid()`
+- `expect(value).toBeUuid()`
 - `expect(value).toBeEntity()`
 - `expect(entity).toHaveComponent(name)`
 

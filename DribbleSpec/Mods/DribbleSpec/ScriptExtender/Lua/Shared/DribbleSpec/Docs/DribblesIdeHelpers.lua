@@ -27,7 +27,7 @@
 ---@field toHaveBeenCalled fun()
 ---@field toHaveBeenCalledTimes fun(count: integer)
 ---@field toHaveBeenCalledWith fun(...)
----@field toBeGuid fun()
+---@field toBeUuid fun()
 ---@field toBeEntity fun()
 ---@field toHaveComponent fun(componentName: string)
 

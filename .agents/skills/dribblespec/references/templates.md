@@ -43,7 +43,7 @@ D.describe("Entity checks", { tags = { "entity", "server" } }, function()
             return
         end
 
-        ctx.expect(guid).toBeGuid()
+        ctx.expect(guid).toBeUuid()
         ctx.expect(entity).toBeEntity()
         ctx.expect(entity).toHaveComponent("DisplayName")
     end)

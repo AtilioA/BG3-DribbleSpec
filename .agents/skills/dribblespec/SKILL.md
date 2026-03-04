@@ -80,7 +80,7 @@ Ext.Require("Shared/MyMod/Tests/Runtime.test.lua")
 
 ### Entity assertions
 
-- Use domain matchers when possible: `toBeGuid`, `toBeEntity`, `toHaveComponent`.
+- Use domain matchers when possible: `toBeUuid`, `toBeEntity`, `toHaveComponent`.
 - Prefer `entityRef` for stale-handle resilience in longer flows.
 
 ### Entity userdata lifetime (Context7-verified)
