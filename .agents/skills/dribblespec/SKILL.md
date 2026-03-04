@@ -79,6 +79,24 @@ Ext.Require("Shared/MyMod/Tests/Runtime.test.lua")
 - Use domain matchers when possible: `toBeGuid`, `toBeEntity`, `toHaveComponent`.
 - Prefer `entityRef` for stale-handle resilience in longer flows.
 
+### Entity userdata lifetime (Context7-verified)
+
+- BG3SE `userdata` objects are scope/lifetime-bound; they are valid during current Lua call, but may expire afterwards.
+- Avoid caching component userdata (or nested userdata like `entity.SpellBook.Spells[...]`) across ticks/events.
+- Accessing expired userdata can raise errors like: `Attempted to read object ... whose lifetime has expired`.
+- Persist stable identity only (GUID / NetId), then re-resolve when needed (`ctx.entityRef(...)` / `D.entityRef(...)`, or fresh `Ext.Entity.Get(...)`). DribbleSpec provides `ctx.entityRef` and `D.entityRef` helpers for this, and will automatically resolve GUIDs to entities when needed (instead of caching expired handles).
+- Before deeper reads in delayed callbacks, prefer an alive check (`entity:IsAlive()`), then re-fetch component data.
+- `entity:GetComponent(name)` returns `nil` when missing; treat missing components as expected branch, not crash path.
+
+Incorrect pattern (cache nested userdata across ticks):
+
+```lua
+local spells = Ext.Entity.Get(guid).SpellBook.Spells
+Ext.OnNextTick(function()
+    local spellId = spells[1].SpellUUID -- lifetime-risky
+end)
+```
+
 ### Context-sensitive component checks
 
 - `DisplayName` assertions are reliable in server context.

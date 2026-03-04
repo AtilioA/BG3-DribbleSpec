@@ -57,16 +57,9 @@ D.describe("MyMod smoke", { tags = { "unit" } }, function()
 end)
 ```
 
-## Manifest setup (`DribbleTests.lua`)
+## Test loading setup (`DribbleTests.lua`)
 
-Create `Lua/DribbleTests.lua` in your consumer mod and load test files explicitly:
-
-```lua
-Ext.Require("Shared/MyMod/Tests/_Init.lua")
-return true
-```
-
-In `Shared/MyMod/Tests/_Init.lua`, include your suites:
+Create test files in your consumer mod and load them explicitly:
 
 ```lua
 Ext.Require("Shared/MyMod/Tests/Smoke.test.lua")
@@ -83,7 +76,6 @@ Use DribbleSpec console command:
 - tag filter: `dribble --tag runtime --tag server`
 - context: `dribble --context server`
 - fail fast: `dribble --fail-fast`
-- custom manifest: `dribble --manifest DribbleTests.lua`
 
 ## Unit test example
 

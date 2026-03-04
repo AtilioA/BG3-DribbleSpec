@@ -32,3 +32,13 @@
 
 - Symptom: direct entity userdata becomes invalid across ticks/lifecycle transitions.
 - Fix: use `ctx.entityRef(...)` / `D.entityRef(...)` and resolve late.
+
+## Lifetime-expired userdata error
+
+- Symptom: error text like `Attempted to read object ... whose lifetime has expired`.
+- Trigger pattern: storing component or nested userdata in outer scope, then reading it in `Ext.OnNextTick`, timer callbacks, or later event handlers.
+- Fix:
+  1. store GUID/NetId instead of userdata
+  2. re-resolve entity at point-of-use
+  3. optionally check `entity:IsAlive()` before component reads
+  4. treat missing component (`GetComponent(...) == nil`) as expected branch
