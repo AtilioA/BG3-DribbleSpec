@@ -90,11 +90,15 @@
 ---@field globalTags? string[] Appended to every `describe/test` metadata tags array
 ---@field commandAlias? string Optional extra console command that runs this mod's tests only
 
+---@param options? DribbleSpecRegisterOptions
+---@return DribbleSpecGlobals
+function RegisterTestGlobals(options) end
+
 --- RegisterTestGlobals is the primary entrypoint for consumers.
 --- Suggested usage: `D = RegisterTestGlobals({ commandAlias = "mytests" })`
 ---@param options? DribbleSpecRegisterOptions
 ---@return DribbleSpecGlobals
-function RegisterTestGlobals(options) end
+function Mods.Dribbles.RegisterTestGlobals(options) end
 
 -- Provide autocomplete if users assign to `D` or use it directly
 ---@type DribbleSpecGlobals
