@@ -1,8 +1,8 @@
-local Dribble = _G.Dribble or Ext.Require("Shared/DribbleSpec/init.lua")
+local DribbleSpec = _G.DribbleSpec or Ext.Require("Shared/DribbleSpec/init.lua")
 local Assertions = Ext.Require("Shared/DribbleSpec/Tests/Support/Assertions.lua")
 
-Dribble.describe("DribbleSpec Phase5 P5.4 nextTick", { tags = { "unit", "phase5", "runtime" } }, function()
-    Dribble.test("ctx.nextTick is available and callable", function(ctx)
+DribbleSpec.describe("DribbleSpec Phase5 P5.4 nextTick", { tags = { "unit", "phase5", "runtime" } }, function()
+    DribbleSpec.test("ctx.nextTick is available and callable", function(ctx)
         Assertions.Equals(type(ctx.nextTick), "function", "nextTick type")
         ctx.nextTick()
         ctx.nextTick()

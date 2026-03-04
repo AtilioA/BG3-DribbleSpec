@@ -3,7 +3,7 @@ local ServerRunChannel = {}
 local DEFAULT_CHANNEL_NAME = "DribbleSpec_RunServer"
 local REGISTERED_FLAG = "__DRIBBLESPEC_SERVER_RUN_HANDLER_REGISTERED"
 
----@class DribbleServerRunChannelDeps
+---@class DribbleSpecServerRunChannelDeps
 ---@field moduleUUID string
 ---@field options table
 ---@field runLocal fun(options: table): table
@@ -11,7 +11,7 @@ local REGISTERED_FLAG = "__DRIBBLESPEC_SERVER_RUN_HANDLER_REGISTERED"
 ---@field isServer fun(): boolean
 ---@field createChannel fun(moduleUUID: string, channelName: string): table|nil
 
----@param deps DribbleServerRunChannelDeps
+---@param deps DribbleSpecServerRunChannelDeps
 ---@param channelName string|nil
 ---@return table
 function ServerRunChannel.Create(deps, channelName)

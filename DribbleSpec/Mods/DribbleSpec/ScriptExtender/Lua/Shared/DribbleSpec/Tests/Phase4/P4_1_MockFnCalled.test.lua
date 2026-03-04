@@ -1,4 +1,4 @@
-local Dribble = _G.Dribble or Ext.Require("Shared/DribbleSpec/init.lua")
+local DribbleSpec = _G.DribbleSpec or Ext.Require("Shared/DribbleSpec/init.lua")
 local Assertions = Ext.Require("Shared/DribbleSpec/Tests/Support/Assertions.lua")
 local RunnerHarness = Ext.Require("Shared/DribbleSpec/Tests/Support/RunnerHarness.lua")
 
@@ -13,8 +13,8 @@ local function captureError(fn)
     return tostring(err)
 end
 
-Dribble.describe("DribbleSpec Phase4 P4.1 mockFn called", { tags = { "unit", "phase4", "doubles" } }, function()
-    Dribble.test("ctx.mockFn returns callable spy and toHaveBeenCalled reflects invocation", function()
+DribbleSpec.describe("DribbleSpec Phase4 P4.1 mockFn called", { tags = { "unit", "phase4", "doubles" } }, function()
+    DribbleSpec.test("ctx.mockFn returns callable spy and toHaveBeenCalled reflects invocation", function()
         local run = RunnerHarness.Run(function(dsl)
             dsl.describe("phase4 mockFn suite", function()
                 dsl.test("mockFn baseline", function(ctx)

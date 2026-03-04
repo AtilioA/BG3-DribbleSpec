@@ -65,7 +65,7 @@ D.describe("Fixture flow", { tags = { "runtime", "entity" } }, function()
 end)
 ```
 
-## Dribble include template
+## DribbleSpec include template
 
 ```lua
 Ext.Require("Shared/MyMod/Tests/Smoke.test.lua")

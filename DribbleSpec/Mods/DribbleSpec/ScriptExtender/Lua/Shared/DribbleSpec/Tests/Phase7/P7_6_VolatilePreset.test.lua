@@ -1,4 +1,4 @@
-local Dribble = _G.Dribble or Ext.Require("Shared/DribbleSpec/init.lua")
+local DribbleSpec = _G.DribbleSpec or Ext.Require("Shared/DribbleSpec/init.lua")
 local Assertions = Ext.Require("Shared/DribbleSpec/Tests/Support/Assertions.lua")
 
 ---@param fn function
@@ -12,9 +12,9 @@ local function captureError(fn)
     return tostring(err)
 end
 
-Dribble.describe("DribbleSpec Phase7 P7.6 volatile preset", { tags = { "unit", "phase7", "expect", "entity" } },
+DribbleSpec.describe("DribbleSpec Phase7 P7.6 volatile preset", { tags = { "unit", "phase7", "expect", "entity" } },
     function()
-        Dribble.test("toEqual supports optional volatile preset filtering", function()
+        DribbleSpec.test("toEqual supports optional volatile preset filtering", function()
             local expected = {
                 DisplayName = {
                     Name = "Shadowheart",
@@ -35,12 +35,12 @@ Dribble.describe("DribbleSpec Phase7 P7.6 volatile preset", { tags = { "unit", "
                 RuntimeEntityId = 222,
             }
 
-            Dribble.expect(actual).toEqual(expected, {
+            DribbleSpec.expect(actual).toEqual(expected, {
                 volatilePreset = "entity",
             })
         end)
 
-        Dribble.test("volatile filtering is opt-in and does not hide stable mismatches", function()
+        DribbleSpec.test("volatile filtering is opt-in and does not hide stable mismatches", function()
             local expected = {
                 stable = {
                     hp = 42,
@@ -56,12 +56,12 @@ Dribble.describe("DribbleSpec Phase7 P7.6 volatile preset", { tags = { "unit", "
             }
 
             local noPresetErr = captureError(function()
-                Dribble.expect(actual).toEqual(expected)
+                DribbleSpec.expect(actual).toEqual(expected)
             end)
             Assertions.Contains(noPresetErr, "toEqual", "no preset mismatch")
 
             local stableMismatchErr = captureError(function()
-                Dribble.expect(actual).toEqual(expected, {
+                DribbleSpec.expect(actual).toEqual(expected, {
                     volatilePreset = "entity",
                 })
             end)
@@ -69,9 +69,9 @@ Dribble.describe("DribbleSpec Phase7 P7.6 volatile preset", { tags = { "unit", "
             Assertions.Contains(stableMismatchErr, "$.stable.hp", "stable mismatch path")
         end)
 
-        Dribble.test("unknown volatile preset fails with actionable error", function()
+        DribbleSpec.test("unknown volatile preset fails with actionable error", function()
             local err = captureError(function()
-                Dribble.expect({}).toEqual({}, {
+                DribbleSpec.expect({}).toEqual({}, {
                     volatilePreset = "unknown",
                 })
             end)

@@ -1,12 +1,12 @@
-local Dribble = _G.Dribble or Ext.Require("Shared/DribbleSpec/init.lua")
+local DribbleSpec = _G.DribbleSpec or Ext.Require("Shared/DribbleSpec/init.lua")
 local SkipSignal = Ext.Require("Shared/DribbleSpec/Runtime/SkipSignal.lua")
 
 local GUID_SHADOWHEART = "3ed74f06-3c60-42dc-83f6-f034cb47c679"
 
-Dribble.describe("DribbleSpec Phase7 P7.7 optional entity integration", {
+DribbleSpec.describe("DribbleSpec Phase7 P7.7 optional entity integration", {
     tags = { "phase7", "integration", "entity", "server" },
 }, function()
-    Dribble.test("entity domain matchers work with a known preplaced entity when available", function(ctx)
+    DribbleSpec.test("entity domain matchers work with a known preplaced entity when available", function(ctx)
         ctx.requireServer()
 
         local probe = Ext.Entity.Get(GUID_SHADOWHEART)

@@ -1,6 +1,6 @@
 local RunService = {}
 
----@class DribbleRunServiceDeps
+---@class DribbleSpecRunServiceDeps
 ---@field registry table
 ---@field options table
 ---@field clock table
@@ -23,7 +23,7 @@ local function hasRegisteredSuites(snapshot)
     return #suites > 0
 end
 
----@param deps DribbleRunServiceDeps
+---@param deps DribbleSpecRunServiceDeps
 ---@return table
 function RunService.Create(deps)
     local service = {}
@@ -45,7 +45,7 @@ function RunService.Create(deps)
 
         if not hasRegisteredSuites(snapshot) then
             deps.resultModel.AddWarning(runResult,
-                "No tests registered; import your test files before running dribble.")
+                "No tests registered; import your test files before running dribbles.")
         end
 
         runResult.caller = {

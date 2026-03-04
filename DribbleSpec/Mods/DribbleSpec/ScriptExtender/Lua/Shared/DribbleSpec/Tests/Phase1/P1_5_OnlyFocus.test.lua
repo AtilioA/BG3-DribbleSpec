@@ -1,9 +1,9 @@
-local Dribble = _G.Dribble or Ext.Require("Shared/DribbleSpec/init.lua")
+local DribbleSpec = _G.DribbleSpec or Ext.Require("Shared/DribbleSpec/init.lua")
 local Assertions = Ext.Require("Shared/DribbleSpec/Tests/Support/Assertions.lua")
 local RunnerHarness = Ext.Require("Shared/DribbleSpec/Tests/Support/RunnerHarness.lua")
 
-Dribble.describe("DribbleSpec Phase1 P1.5 test.only focus", { tags = { "unit", "phase1" } }, function()
-    Dribble.test("runs only focused tests and skips the rest", function()
+DribbleSpec.describe("DribbleSpec Phase1 P1.5 test.only focus", { tags = { "unit", "phase1" } }, function()
+    DribbleSpec.test("runs only focused tests and skips the rest", function()
         local run = RunnerHarness.Run(function(dsl)
             dsl.describe("focus suite", function()
                 dsl.test("non focused A", function()

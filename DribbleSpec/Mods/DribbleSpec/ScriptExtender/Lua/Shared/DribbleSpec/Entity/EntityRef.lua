@@ -1,4 +1,4 @@
----@class DribbleEntityRef
+---@class DribbleSpecEntityRef
 ---@field __dribbleEntityRef boolean
 ---@field private _guid string|nil
 ---@field private _netId number|nil
@@ -134,7 +134,7 @@ local function normalizeSource(source)
 end
 
 ---@param source any
----@return DribbleEntityRef
+---@return DribbleSpecEntityRef
 function EntityRef.Create(source)
     if type(source) == "table" and source.__dribbleEntityRef == true and type(source.Resolve) == "function" then
         return source
@@ -202,7 +202,7 @@ function EntityRef:IsEntityRef()
 end
 
 ---@param source any
----@return DribbleEntityRef|nil
+---@return DribbleSpecEntityRef|nil
 function EntityRef.TryCreate(source)
     if source == nil then
         return nil

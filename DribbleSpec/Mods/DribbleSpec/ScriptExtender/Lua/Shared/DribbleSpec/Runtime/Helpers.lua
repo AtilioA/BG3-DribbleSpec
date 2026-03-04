@@ -2,7 +2,7 @@ local SkipSignal = Ext.Require("Shared/DribbleSpec/Runtime/SkipSignal.lua")
 
 local Helpers = {}
 
----@class DribbleRuntimeHelpersParams
+---@class DribbleSpecRuntimeHelpersParams
 ---@field context string|nil
 ---@field options table|nil
 ---@field tickDriver function|nil
@@ -35,7 +35,7 @@ local function resolveWaitFor()
     return Ext.Timer.WaitFor
 end
 
----@param params DribbleRuntimeHelpersParams|nil
+---@param params DribbleSpecRuntimeHelpersParams|nil
 ---@return table
 function Helpers.Create(params)
     local resolvedParams = params or {}

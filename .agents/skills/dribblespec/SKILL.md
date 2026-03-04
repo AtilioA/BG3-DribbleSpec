@@ -1,6 +1,6 @@
 ---
 name: dribblespec
-description: Use this skill whenever a request involves BG3SE mod testing with DribbleSpec: creating or migrating tests, wiring `RegisterTestGlobals()`, using `describe/test/expect`, running `dribble` filters, debugging runtime or entity failures, or fixing client/server flakiness. Trigger even if the user only says "BG3 tests" or "dribble". Skip this skill for unrelated gameplay features or general Lua code with no test setup/execution work.
+description: Use this skill whenever a request involves BG3SE mod testing with DribbleSpec: creating or migrating tests, wiring `RegisterTestGlobals()`, using `describe/test/expect`, running `dribbles` filters, debugging runtime or entity failures, or fixing client/server flakiness. Trigger even if the user only says "BG3 tests" or "dribbles". Skip this skill for unrelated gameplay features or general Lua code with no test setup/execution work.
 ---
 
 # DribbleSpec Agent Skill
@@ -14,7 +14,7 @@ Use this skill whenever the task involves any of:
 - creating or updating DribbleSpec test suites
 - wiring consumer tests with `RegisterTestGlobals()`
 - writing runtime/entity assertions for BG3SE behavior
-- running tests via `dribble` and diagnosing failures
+- running tests via `dribbles` and diagnosing failures
 - reducing flaky behavior due to BG3SE context/lifecycle issues
 
 If the user asks for BG3 mod testing and does not mention a framework, still use this skill and standardize on DribbleSpec patterns.
@@ -35,7 +35,7 @@ local D = RegisterTestGlobals()
 ## Standard workflow for agents
 
 1. Confirm/create test entrypoint include file(s) with explicit `Ext.Require` calls.
-2. In each test file, import Dribble globals table once (`local D = RegisterTestGlobals()`).
+2. In each test file, import DribbleSpec globals table once (`local D = RegisterTestGlobals()`).
 3. Write tests via public API (`D.describe`, `D.test`, hooks, `ctx` helpers).
 4. Run targeted tests first (`--name` or `--tag`) then broader run.
 5. Fix failures through behavior assertions, not internal implementation coupling.
@@ -66,12 +66,13 @@ Ext.Require("Shared/MyMod/Tests/Runtime.test.lua")
 
 ## CLI execution patterns
 
-- all tests: `dribble`
-- help: `dribble --help`
-- one area: `dribble --name "phase8"`
-- subset by tags (AND): `dribble --tag runtime --tag server`
-- force context filter: `dribble --context server`
-- stop early: `dribble --fail-fast`
+- all tests: `dribbles`
+- shorthand: `d`
+- help: `dribbles --help`
+- one area: `dribbles --name "phase8"`
+- subset by tags (AND): `dribbles --tag runtime --tag server`
+- force context filter: `dribbles --context server`
+- stop early: `dribbles --fail-fast`
 
 ## BG3 domain guidance
 

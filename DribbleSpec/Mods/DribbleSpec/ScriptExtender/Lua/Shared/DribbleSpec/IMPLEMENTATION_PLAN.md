@@ -4,9 +4,9 @@ This roadmap implements `SPEC.md` with JSON reporting as the final phase.
 
 ## Locked Decisions
 
-- Command name: `dribble`.
+- Command name: `dribbles`.
 - Caller mod display name source: `Ext.Mod.GetMod(<moduleUUID>).Info.Name`.
-- Explicit include manifest name: `DribbleTests.lua`.
+- Explicit include manifest name: `DribbleSpecTests.lua`.
 - Framework style: greenfield, standalone, mod-agnostic.
 - Development style: no automated tests in Phase 0; strict TDD + dogfooding starts in Phase 1.
 - JSON reporter: lowest priority.
@@ -21,8 +21,8 @@ Goal:
 Scope:
 - Create DribbleSpec folder/module scaffold.
 - Implement internal contracts for registry, runner, result model, options parsing, sandbox placeholder.
-- Implement command plumbing (`dribble`) and manual smoke run flow.
-- Implement explicit manifest loading contract (`DribbleTests.lua`).
+- Implement command plumbing (`dribbles`) and manual smoke run flow.
+- Implement explicit manifest loading contract (`DribbleSpecTests.lua`).
 - Add docs updates and Context7 reference guidance.
 
 Validation approach:
@@ -30,22 +30,22 @@ Validation approach:
 
 Exit criteria:
 - `Ext.Require("Shared/DribbleSpec/init.lua")` loads.
-- `dribble` command executes and returns deterministic empty summary when no tests are registered.
-- `dribble --help` prints usable options.
+- `dribbles` command executes and returns deterministic empty summary when no tests are registered.
+- `dribbles --help` prints usable options.
 
 ### Phase 1 - Minimal Runnable Framework (Start TDD Here)
 
 Goal:
-- Dribble can run its own tests.
+- DribbleSpec can run its own tests.
 
 Scope:
 - Implement DSL registration basics: `describe`, `test`, `it`, `test.skip`, `test.only`.
 - Implement hooks: `beforeAll`, `beforeEach`, `afterEach`, `afterAll`.
 - Implement deterministic registration order.
-- Create Dribble self-tests and run them through Dribble (dogfooding starts).
+- Create DribbleSpec self-tests and run them through DribbleSpec (dogfooding starts).
 
 Exit criteria:
-- Dribble self-tests can be loaded from explicit manifest and executed by `dribble`.
+- DribbleSpec self-tests can be loaded from explicit manifest and executed by `dribbles`.
 
 ### Phase 2 - Runner and Filtering
 
@@ -58,7 +58,7 @@ Scope:
 - Run control: `--fail-fast`.
 
 Exit criteria:
-- Filter and control behavior covered by Dribble self-tests.
+- Filter and control behavior covered by DribbleSpec self-tests.
 
 ### Phase 3 - Expect Core
 
@@ -165,7 +165,7 @@ Exit criteria:
 ### A) Phase 1 Objective
 
 - DribbleSpec can register and execute tests through public APIs.
-- DribbleSpec self-tests run via `dribble` from explicit `DribbleTests.lua` includes.
+- DribbleSpec self-tests run via `dribbles` from explicit `DribbleSpecTests.lua` includes.
 - Development follows strict vertical TDD slices (no horizontal test batching).
 
 ### B) Public Behavior Contract for Phase 1
@@ -196,8 +196,8 @@ Each slice rule:
 ### D) Dogfooding Setup
 
 - Self-tests live under `Shared/DribbleSpec/Tests/`.
-- Explicit include manifest remains `Lua/DribbleTests.lua`.
-- `DribbleTests.lua` loads self-test files with `Ext.Require`.
+- Explicit include manifest remains `Lua/DribbleSpecTests.lua`.
+- `DribbleSpecTests.lua` loads self-test files with `Ext.Require`.
 
 ### E) Runtime and Tooling Notes
 
@@ -207,7 +207,7 @@ Each slice rule:
 
 ### F) Phase 1 Exit Criteria
 
-- `dribble` runs self-tests and reports correct pass/fail/skip totals.
+- `dribbles` runs self-tests and reports correct pass/fail/skip totals.
 - Hook failure policies are implemented exactly as locked.
 - Deterministic ordering is proven by self-tests.
 - No tests rely on internal modules or private state.
@@ -248,7 +248,7 @@ Status (2026-03-03):
 - Unknown args preserved for diagnostics.
 
 ### Command Contract
-- `dribble` calls parse -> manifest load -> run.
+- `dribbles` calls parse -> manifest load -> run.
 - Help path exits without running.
 
 ## B) Phase 0 Build Tasks
@@ -269,11 +269,11 @@ Status (2026-03-03):
 - run path can execute empty registry and return stable result.
 
 3. Implement command plumbing:
-- register `dribble` once.
+- register `dribbles` once.
 - parse and print help/options/summary.
 
 4. Implement explicit include-manifest behavior:
-- default manifest `DribbleTests.lua`.
+- default manifest `DribbleSpecTests.lua`.
 - safe loading with warning on missing manifest.
 
 5. Documentation updates:
@@ -283,9 +283,9 @@ Status (2026-03-03):
 ## C) Phase 0 Manual Smoke Checklist
 
 - Load check: require DribbleSpec init module.
-- Help check: run `dribble --help`.
-- Empty run check: run `dribble` with no manifest present and verify deterministic zero-summary output.
-- Manifest check: run `dribble --manifest <path>` with a valid file and verify load path is used.
+- Help check: run `dribbles --help`.
+- Empty run check: run `dribbles` with no manifest present and verify deterministic zero-summary output.
+- Manifest check: run `dribbles --manifest <path>` with a valid file and verify load path is used.
 
 ## D) Risks and Mitigations
 

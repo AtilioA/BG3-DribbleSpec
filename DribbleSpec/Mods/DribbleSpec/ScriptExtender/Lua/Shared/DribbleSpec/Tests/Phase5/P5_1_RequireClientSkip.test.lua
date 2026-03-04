@@ -1,9 +1,9 @@
-local Dribble = _G.Dribble or Ext.Require("Shared/DribbleSpec/init.lua")
+local DribbleSpec = _G.DribbleSpec or Ext.Require("Shared/DribbleSpec/init.lua")
 local Assertions = Ext.Require("Shared/DribbleSpec/Tests/Support/Assertions.lua")
 local RunnerHarness = Ext.Require("Shared/DribbleSpec/Tests/Support/RunnerHarness.lua")
 
-Dribble.describe("DribbleSpec Phase5 P5.1 requireClient skip", { tags = { "unit", "phase5", "runtime" } }, function()
-    Dribble.test("ctx.requireClient marks mismatch as skipped", function()
+DribbleSpec.describe("DribbleSpec Phase5 P5.1 requireClient skip", { tags = { "unit", "phase5", "runtime" } }, function()
+    DribbleSpec.test("ctx.requireClient marks mismatch as skipped", function()
         local run = RunnerHarness.Run(function(dsl)
             dsl.describe("requireClient suite", function()
                 dsl.test("client-only test", function(ctx)

@@ -1,9 +1,9 @@
-local Dribble = _G.Dribble or Ext.Require("Shared/DribbleSpec/init.lua")
+local DribbleSpec = _G.DribbleSpec or Ext.Require("Shared/DribbleSpec/init.lua")
 local Assertions = Ext.Require("Shared/DribbleSpec/Tests/Support/Assertions.lua")
 local ExecutionRouter = Ext.Require("Shared/DribbleSpec/Runtime/ExecutionRouter.lua")
 
-Dribble.describe("DribbleSpec ExecutionRouter server targeting", { tags = { "unit", "phase1" } }, function()
-    Dribble.test("routes client --context server through remote request", function()
+DribbleSpec.describe("DribbleSpec ExecutionRouter server targeting", { tags = { "unit", "phase1" } }, function()
+    DribbleSpec.test("routes client --context server through remote request", function()
         local localRuns = 0
         local remoteRuns = 0
         local rendered = {}
@@ -49,7 +49,7 @@ Dribble.describe("DribbleSpec ExecutionRouter server targeting", { tags = { "uni
         Assertions.Contains(lines[1], "Requested server-context run", "info line")
     end)
 
-    Dribble.test("runs local when server targeting is not requested", function()
+    DribbleSpec.test("runs local when server targeting is not requested", function()
         local localRuns = 0
         local remoteRuns = 0
         local rendered = {}

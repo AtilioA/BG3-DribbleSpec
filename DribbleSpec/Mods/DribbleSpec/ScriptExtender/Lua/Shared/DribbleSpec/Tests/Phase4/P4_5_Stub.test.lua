@@ -1,4 +1,4 @@
-local Dribble = _G.Dribble or Ext.Require("Shared/DribbleSpec/init.lua")
+local DribbleSpec = _G.DribbleSpec or Ext.Require("Shared/DribbleSpec/init.lua")
 local Assertions = Ext.Require("Shared/DribbleSpec/Tests/Support/Assertions.lua")
 
 ---@param fn function
@@ -12,8 +12,8 @@ local function captureError(fn)
     return tostring(err)
 end
 
-Dribble.describe("DribbleSpec Phase4 P4.5 stub", { tags = { "unit", "phase4", "doubles" } }, function()
-    Dribble.test("ctx.stub replaces existing function implementation and records calls", function(ctx)
+DribbleSpec.describe("DribbleSpec Phase4 P4.5 stub", { tags = { "unit", "phase4", "doubles" } }, function()
+    DribbleSpec.test("ctx.stub replaces existing function implementation and records calls", function(ctx)
         local target = {
             sum = function(a, b)
                 return a + b
@@ -34,7 +34,7 @@ Dribble.describe("DribbleSpec Phase4 P4.5 stub", { tags = { "unit", "phase4", "d
         ctx.expect(stub).toHaveBeenCalledWith(2, 3)
     end)
 
-    Dribble.test("ctx.stub enforces existing target function", function(ctx)
+    DribbleSpec.test("ctx.stub enforces existing target function", function(ctx)
         local target = {}
         local err = captureError(function()
             ctx.stub(target, "missing", function()

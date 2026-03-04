@@ -1,16 +1,16 @@
----@class DribbleRegistrySuite
+---@class DribbleSpecRegistrySuite
 ---@field id integer
 ---@field name string
 ---@field fullName string
 ---@field metadata table
 ---@field hooks table
 ---@field tests table
----@field suites DribbleRegistrySuite[]
----@field parent DribbleRegistrySuite|nil
+---@field suites DribbleSpecRegistrySuite[]
+---@field parent DribbleSpecRegistrySuite|nil
 ---@field only boolean
 ---@field skip boolean
 
----@class DribbleRegistryTest
+---@class DribbleSpecRegistryTest
 ---@field id integer
 ---@field name string
 ---@field fullName string
@@ -19,10 +19,10 @@
 ---@field only boolean
 ---@field skip boolean
 
----@class DribbleRegistry
+---@class DribbleSpecRegistry
 ---@field private _nextOrder integer
----@field private _rootSuites DribbleRegistrySuite[]
----@field private _suiteStack DribbleRegistrySuite[]
+---@field private _rootSuites DribbleSpecRegistrySuite[]
+---@field private _suiteStack DribbleSpecRegistrySuite[]
 ---@field private _hasOnly boolean
 local Registry = {}
 Registry.__index = Registry
@@ -42,7 +42,7 @@ local function normalizeMetadata(metadata)
     return normalized
 end
 
----@return DribbleRegistry
+---@return DribbleSpecRegistry
 function Registry.Create()
     return setmetatable({
         _nextOrder = 1,
@@ -59,14 +59,14 @@ function Registry:NextOrder()
     return current
 end
 
----@return DribbleRegistrySuite|nil
+---@return DribbleSpecRegistrySuite|nil
 function Registry:CurrentSuite()
     return self._suiteStack[#self._suiteStack]
 end
 
 ---@param name string
 ---@param metadata table|nil
----@return DribbleRegistrySuite
+---@return DribbleSpecRegistrySuite
 function Registry:BeginSuite(name, metadata)
     if type(name) ~= "string" or name == "" then
         error("describe() requires a non-empty suite name", 2)
@@ -111,7 +111,7 @@ function Registry:BeginSuite(name, metadata)
     return suite
 end
 
----@return DribbleRegistrySuite
+---@return DribbleSpecRegistrySuite
 function Registry:EndSuite()
     local suite = table.remove(self._suiteStack)
     if not suite then
@@ -150,7 +150,7 @@ end
 ---@param name string
 ---@param metadata table|nil
 ---@param callback function
----@return DribbleRegistryTest
+---@return DribbleSpecRegistryTest
 function Registry:AddTest(name, metadata, callback)
     local suite = self:CurrentSuite()
     if not suite then

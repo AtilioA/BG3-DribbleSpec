@@ -1,9 +1,9 @@
-local Dribble = _G.Dribble or Ext.Require("Shared/DribbleSpec/init.lua")
+local DribbleSpec = _G.DribbleSpec or Ext.Require("Shared/DribbleSpec/init.lua")
 local Assertions = Ext.Require("Shared/DribbleSpec/Tests/Support/Assertions.lua")
 
-Dribble.describe("DribbleSpec Phase8 P8.3 RegisterTestGlobals side effects", { tags = { "unit", "phase8", "consumer" } },
+DribbleSpec.describe("DribbleSpec Phase8 P8.3 RegisterTestGlobals side effects", { tags = { "unit", "phase8", "consumer" } },
     function()
-        Dribble.test("RegisterTestGlobals does not mutate _G or Mods", function()
+        DribbleSpec.test("RegisterTestGlobals does not mutate _G or Mods", function()
             local originalDescribe = rawget(_G, "describe")
             local originalTest = rawget(_G, "test")
             local originalMods = rawget(_G, "Mods")
@@ -17,7 +17,7 @@ Dribble.describe("DribbleSpec Phase8 P8.3 RegisterTestGlobals side effects", { t
             Assertions.Equals(rawget(_G, "Mods"), originalMods, "Mods table unchanged")
         end)
 
-        Dribble.test("RegisterTestGlobals rejects arguments", function()
+        DribbleSpec.test("RegisterTestGlobals rejects arguments", function()
             local ok, err = xpcall(function()
                 RegisterTestGlobals({})
             end, debug.traceback)

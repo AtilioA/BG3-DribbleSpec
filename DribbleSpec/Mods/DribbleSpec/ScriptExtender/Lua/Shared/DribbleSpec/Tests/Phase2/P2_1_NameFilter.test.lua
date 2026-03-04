@@ -1,9 +1,9 @@
-local Dribble = _G.Dribble or Ext.Require("Shared/DribbleSpec/init.lua")
+local DribbleSpec = _G.DribbleSpec or Ext.Require("Shared/DribbleSpec/init.lua")
 local Assertions = Ext.Require("Shared/DribbleSpec/Tests/Support/Assertions.lua")
 local RunnerHarness = Ext.Require("Shared/DribbleSpec/Tests/Support/RunnerHarness.lua")
 
-Dribble.describe("DribbleSpec Phase2 P2.1 name filtering", { tags = { "unit", "phase2", "filter" } }, function()
-    Dribble.test("matches fullName by plain substring, case-insensitive", function()
+DribbleSpec.describe("DribbleSpec Phase2 P2.1 name filtering", { tags = { "unit", "phase2", "filter" } }, function()
+    DribbleSpec.test("matches fullName by plain substring, case-insensitive", function()
         local trace = {}
 
         local run = RunnerHarness.Run(function(dsl)

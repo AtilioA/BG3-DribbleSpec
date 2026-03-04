@@ -1,9 +1,9 @@
-local Dribble = _G.Dribble or Ext.Require("Shared/DribbleSpec/init.lua")
+local DribbleSpec = _G.DribbleSpec or Ext.Require("Shared/DribbleSpec/init.lua")
 local Assertions = Ext.Require("Shared/DribbleSpec/Tests/Support/Assertions.lua")
 local RunnerHarness = Ext.Require("Shared/DribbleSpec/Tests/Support/RunnerHarness.lua")
 
-Dribble.describe("DribbleSpec Phase6 P6.5 default providers", { tags = { "unit", "phase6", "fixture" } }, function()
-    Dribble.test("default preplaced provider resolves aliases via Ext.Entity.Get", function()
+DribbleSpec.describe("DribbleSpec Phase6 P6.5 default providers", { tags = { "unit", "phase6", "fixture" } }, function()
+    DribbleSpec.test("default preplaced provider resolves aliases via Ext.Entity.Get", function()
         local calls = 0
         local resolvedEntity = {
             Guid = "known-guid",
@@ -38,7 +38,7 @@ Dribble.describe("DribbleSpec Phase6 P6.5 default providers", { tags = { "unit",
         Assertions.Equals(calls, 1, "resolve call count")
     end)
 
-    Dribble.test("default spawn provider supports spawn function and cleanup", function()
+    DribbleSpec.test("default spawn provider supports spawn function and cleanup", function()
         local cleanupCount = 0
 
         local run = RunnerHarness.Run(function(dsl)

@@ -1,9 +1,9 @@
-local Dribble = _G.Dribble or Ext.Require("Shared/DribbleSpec/init.lua")
+local DribbleSpec = _G.DribbleSpec or Ext.Require("Shared/DribbleSpec/init.lua")
 local Assertions = Ext.Require("Shared/DribbleSpec/Tests/Support/Assertions.lua")
 local ConsoleIO = Ext.Require("Shared/DribbleSpec/Internal/ConsoleIO.lua")
 
-Dribble.describe("DribbleSpec RunFromArgs integration", { tags = { "integration", "phase1" } }, function()
-    Dribble.test("returns deterministic empty run for --help", function()
+DribbleSpec.describe("DribbleSpec RunFromArgs integration", { tags = { "integration", "phase1" } }, function()
+    DribbleSpec.test("returns deterministic empty run for --help", function()
         local originalPrintHelp = ConsoleIO.PrintHelp
         local helpCalls = 0
 
@@ -13,7 +13,7 @@ Dribble.describe("DribbleSpec RunFromArgs integration", { tags = { "integration"
                 Assertions.Equals(topic, nil, "help topic")
             end
 
-            local run = Dribble.RunFromArgs({ "dribble", "--help" })
+            local run = DribbleSpec.RunFromArgs({ "dribbles", "--help" })
 
             Assertions.Equals(run.status, "passed", "run status")
             Assertions.Equals(run.context, "unknown", "run context")
@@ -30,7 +30,7 @@ Dribble.describe("DribbleSpec RunFromArgs integration", { tags = { "integration"
         end
     end)
 
-    Dribble.test("forwards optional help topic to ConsoleIO", function()
+    DribbleSpec.test("forwards optional help topic to ConsoleIO", function()
         local originalPrintHelp = ConsoleIO.PrintHelp
         local observedTopic = nil
 
@@ -39,7 +39,7 @@ Dribble.describe("DribbleSpec RunFromArgs integration", { tags = { "integration"
                 observedTopic = topic
             end
 
-            local run = Dribble.RunFromArgs({ "dribble", "--help", "context" })
+            local run = DribbleSpec.RunFromArgs({ "dribbles", "--help", "context" })
             Assertions.Equals(run.status, "passed", "run status")
             Assertions.Equals(observedTopic, "context", "forwarded topic")
         end)

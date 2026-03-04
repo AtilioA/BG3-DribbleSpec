@@ -1,4 +1,4 @@
-local Dribble = _G.Dribble or Ext.Require("Shared/DribbleSpec/init.lua")
+local DribbleSpec = _G.DribbleSpec or Ext.Require("Shared/DribbleSpec/init.lua")
 local Assertions = Ext.Require("Shared/DribbleSpec/Tests/Support/Assertions.lua")
 
 ---@param fn function
@@ -12,8 +12,8 @@ local function captureError(fn)
     return tostring(err)
 end
 
-Dribble.describe("DribbleSpec Phase7 P7.4 toBeEntity", { tags = { "unit", "phase7", "expect", "entity" } }, function()
-    Dribble.test("toBeEntity accepts entity-like values", function()
+DribbleSpec.describe("DribbleSpec Phase7 P7.4 toBeEntity", { tags = { "unit", "phase7", "expect", "entity" } }, function()
+    DribbleSpec.test("toBeEntity accepts entity-like values", function()
         local entityLike = {
             GetComponent = function(_, componentName)
                 if componentName == "DisplayName" then
@@ -26,11 +26,11 @@ Dribble.describe("DribbleSpec Phase7 P7.4 toBeEntity", { tags = { "unit", "phase
             end,
         }
 
-        Dribble.expect(entityLike).toBeEntity()
+        DribbleSpec.expect(entityLike).toBeEntity()
     end)
 
-    Dribble.test("toBeEntity accepts resolvable EntityRef", function()
-        local ref = Dribble.entityRef(function()
+    DribbleSpec.test("toBeEntity accepts resolvable EntityRef", function()
+        local ref = DribbleSpec.entityRef(function()
             return {
                 GetComponent = function(_, componentName)
                     if componentName == "DisplayName" then
@@ -44,23 +44,23 @@ Dribble.describe("DribbleSpec Phase7 P7.4 toBeEntity", { tags = { "unit", "phase
             }
         end)
 
-        Dribble.expect(ref).toBeEntity()
+        DribbleSpec.expect(ref).toBeEntity()
     end)
 
-    Dribble.test("toBeEntity fails for unresolved or non-entity values", function()
-        local unresolvedRef = Dribble.entityRef(function()
+    DribbleSpec.test("toBeEntity fails for unresolved or non-entity values", function()
+        local unresolvedRef = DribbleSpec.entityRef(function()
             return nil
         end)
 
         local unresolvedErr = captureError(function()
-            Dribble.expect(unresolvedRef).toBeEntity()
+            DribbleSpec.expect(unresolvedRef).toBeEntity()
         end)
 
         Assertions.Contains(unresolvedErr, "toBeEntity", "matcher name")
         Assertions.Contains(unresolvedErr, "could not be resolved", "unresolved ref reason")
 
         local nonEntityErr = captureError(function()
-            Dribble.expect({ value = "not entity" }).toBeEntity()
+            DribbleSpec.expect({ value = "not entity" }).toBeEntity()
         end)
 
         Assertions.Contains(nonEntityErr, "toBeEntity", "non-entity matcher name")

@@ -2,7 +2,7 @@ local PreplacedProvider = Ext.Require("Shared/DribbleSpec/Fixtures/Providers/Pre
 local SpawnProvider = Ext.Require("Shared/DribbleSpec/Fixtures/Providers/SpawnProvider.lua")
 local EntityRef = Ext.Require("Shared/DribbleSpec/Entity/EntityRef.lua")
 
----@class DribbleFixtureManager
+---@class DribbleSpecFixtureManager
 ---@field private _sandbox table
 ---@field private _providers table[]
 ---@field private _providerContext table
@@ -109,7 +109,7 @@ local function shouldUseProvider(provider, spec)
     return tostring(provider.name) == forcedProvider
 end
 
----@param self DribbleFixtureManager
+---@param self DribbleSpecFixtureManager
 ---@param handle table
 local function trackHandleTeardown(self, handle)
     if type(handle.teardown) ~= "function" then
@@ -133,7 +133,7 @@ local function trackHandleTeardown(self, handle)
     self._sandbox:TrackRestore(restoreHandle)
 end
 
----@param self DribbleFixtureManager
+---@param self DribbleSpecFixtureManager
 ---@param kind string
 ---@param spec table
 ---@param providerName string
@@ -188,7 +188,7 @@ local function finalizeHandle(self, kind, spec, providerName, resolved)
 end
 
 ---@param params table
----@return DribbleFixtureManager
+---@return DribbleSpecFixtureManager
 function Manager.Create(params)
     local options = params.options or {}
     local providers = params.providers or options.fixtureProviders

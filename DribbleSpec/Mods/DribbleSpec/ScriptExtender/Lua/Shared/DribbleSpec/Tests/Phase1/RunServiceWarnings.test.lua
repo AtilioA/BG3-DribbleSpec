@@ -1,4 +1,4 @@
-local Dribble = _G.Dribble or Ext.Require("Shared/DribbleSpec/init.lua")
+local DribbleSpec = _G.DribbleSpec or Ext.Require("Shared/DribbleSpec/init.lua")
 local Assertions = Ext.Require("Shared/DribbleSpec/Tests/Support/Assertions.lua")
 local Registry = Ext.Require("Shared/DribbleSpec/Core/Registry.lua")
 local ResultModel = Ext.Require("Shared/DribbleSpec/Core/ResultModel.lua")
@@ -20,8 +20,8 @@ local function createRunServiceWithRegistry(registry)
     })
 end
 
-Dribble.describe("DribbleSpec RunService warnings", { tags = { "unit", "phase1", "runtime" } }, function()
-    Dribble.test("adds warning when registry has no suites", function()
+DribbleSpec.describe("DribbleSpec RunService warnings", { tags = { "unit", "phase1", "runtime" } }, function()
+    DribbleSpec.test("adds warning when registry has no suites", function()
         local registry = Registry.Create()
         local service = createRunServiceWithRegistry(registry)
 
@@ -32,7 +32,7 @@ Dribble.describe("DribbleSpec RunService warnings", { tags = { "unit", "phase1",
         Assertions.Contains(run.warnings[1], "No tests registered", "warning text")
     end)
 
-    Dribble.test("does not add empty-registry warning when suites exist", function()
+    DribbleSpec.test("does not add empty-registry warning when suites exist", function()
         local registry = Registry.Create()
         registry:BeginSuite("RunService warning sample", nil)
         registry:AddTest("executes", nil, function()

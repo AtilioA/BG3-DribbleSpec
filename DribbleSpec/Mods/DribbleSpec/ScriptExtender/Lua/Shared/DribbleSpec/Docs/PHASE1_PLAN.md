@@ -32,8 +32,8 @@ Phase 1 starts strict TDD and dogfooding.
 ## Dogfood Setup
 
 - Self-tests location: `Shared/DribbleSpec/Tests/`.
-- Explicit manifest: `Lua/DribbleTests.lua`.
-- Runner command: `dribble`.
+- Explicit manifest: `Lua/DribbleSpecTests.lua`.
+- Runner command: `dribbles`.
 
 ## Iteration
 

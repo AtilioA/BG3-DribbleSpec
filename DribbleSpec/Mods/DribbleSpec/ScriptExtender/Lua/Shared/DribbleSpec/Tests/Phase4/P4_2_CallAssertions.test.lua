@@ -1,4 +1,4 @@
-local Dribble = _G.Dribble or Ext.Require("Shared/DribbleSpec/init.lua")
+local DribbleSpec = _G.DribbleSpec or Ext.Require("Shared/DribbleSpec/init.lua")
 local Assertions = Ext.Require("Shared/DribbleSpec/Tests/Support/Assertions.lua")
 
 ---@param fn function
@@ -12,8 +12,8 @@ local function captureError(fn)
     return tostring(err)
 end
 
-Dribble.describe("DribbleSpec Phase4 P4.2 call assertions", { tags = { "unit", "phase4", "doubles" } }, function()
-    Dribble.test("toHaveBeenCalledTimes validates exact invocation count", function(ctx)
+DribbleSpec.describe("DribbleSpec Phase4 P4.2 call assertions", { tags = { "unit", "phase4", "doubles" } }, function()
+    DribbleSpec.test("toHaveBeenCalledTimes validates exact invocation count", function(ctx)
         local spy = ctx.mockFn()
         spy("a")
         spy("b")
@@ -26,7 +26,7 @@ Dribble.describe("DribbleSpec Phase4 P4.2 call assertions", { tags = { "unit", "
         Assertions.Equals(type(mismatchErr), "string", "count mismatch should throw")
     end)
 
-    Dribble.test("toHaveBeenCalledWith validates call arguments with deep equality", function(ctx)
+    DribbleSpec.test("toHaveBeenCalledWith validates call arguments with deep equality", function(ctx)
         local spy = ctx.mockFn()
         spy(7, "alpha", {
             nested = {

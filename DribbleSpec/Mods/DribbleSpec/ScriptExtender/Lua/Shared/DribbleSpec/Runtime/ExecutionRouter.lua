@@ -1,6 +1,6 @@
 local ExecutionRouter = {}
 
----@class DribbleExecutionRouterDeps
+---@class DribbleSpecExecutionRouterDeps
 ---@field isClient fun(): boolean
 ---@field requestServerRun fun(options: table, onReply: fun(response: table|nil))
 ---@field runLocal fun(options: table): table
@@ -10,7 +10,7 @@ local ExecutionRouter = {}
 ---@field printWarning fun(message: string)
 
 ---@param options table
----@param deps DribbleExecutionRouterDeps
+---@param deps DribbleSpecExecutionRouterDeps
 ---@return table
 function ExecutionRouter.Run(options, deps)
     local targetContext = tostring(options.context or "any")

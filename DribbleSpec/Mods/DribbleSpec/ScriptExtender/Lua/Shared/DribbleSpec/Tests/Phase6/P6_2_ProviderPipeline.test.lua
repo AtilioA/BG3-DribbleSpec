@@ -1,9 +1,9 @@
-local Dribble = _G.Dribble or Ext.Require("Shared/DribbleSpec/init.lua")
+local DribbleSpec = _G.DribbleSpec or Ext.Require("Shared/DribbleSpec/init.lua")
 local Assertions = Ext.Require("Shared/DribbleSpec/Tests/Support/Assertions.lua")
 local RunnerHarness = Ext.Require("Shared/DribbleSpec/Tests/Support/RunnerHarness.lua")
 
-Dribble.describe("DribbleSpec Phase6 P6.2 provider pipeline", { tags = { "unit", "phase6", "fixture" } }, function()
-    Dribble.test("uses preplaced provider before spawn provider", function()
+DribbleSpec.describe("DribbleSpec Phase6 P6.2 provider pipeline", { tags = { "unit", "phase6", "fixture" } }, function()
+    DribbleSpec.test("uses preplaced provider before spawn provider", function()
         local calls = {}
         local run = RunnerHarness.Run(function(dsl)
             dsl.describe("provider order suite", function()
@@ -37,7 +37,7 @@ Dribble.describe("DribbleSpec Phase6 P6.2 provider pipeline", { tags = { "unit",
         Assertions.Equals(calls[1], "preplaced", "provider first")
     end)
 
-    Dribble.test("falls back to spawn provider when preplaced misses", function()
+    DribbleSpec.test("falls back to spawn provider when preplaced misses", function()
         local calls = {}
         local run = RunnerHarness.Run(function(dsl)
             dsl.describe("provider fallback suite", function()
@@ -72,7 +72,7 @@ Dribble.describe("DribbleSpec Phase6 P6.2 provider pipeline", { tags = { "unit",
         Assertions.Equals(calls[2], "spawn", "provider second")
     end)
 
-    Dribble.test("supports explicit provider targeting", function()
+    DribbleSpec.test("supports explicit provider targeting", function()
         local calls = {}
         local run = RunnerHarness.Run(function(dsl)
             dsl.describe("explicit provider suite", function()

@@ -1,4 +1,4 @@
-local Dribble = _G.Dribble or Ext.Require("Shared/DribbleSpec/init.lua")
+local DribbleSpec = _G.DribbleSpec or Ext.Require("Shared/DribbleSpec/init.lua")
 local Assertions = Ext.Require("Shared/DribbleSpec/Tests/Support/Assertions.lua")
 local RunnerHarness = Ext.Require("Shared/DribbleSpec/Tests/Support/RunnerHarness.lua")
 
@@ -13,9 +13,9 @@ local function captureError(fn)
     return tostring(err)
 end
 
-Dribble.describe("DribbleSpec Phase3 P3.1 expect toBe", { tags = { "unit", "phase3", "expect" } }, function()
-    Dribble.test("exposes Dribble.expect and ctx.expect without global alias", function()
-        Assertions.Equals(type(Dribble.expect), "function", "Dribble.expect type")
+DribbleSpec.describe("DribbleSpec Phase3 P3.1 expect toBe", { tags = { "unit", "phase3", "expect" } }, function()
+    DribbleSpec.test("exposes DribbleSpec.expect and ctx.expect without global alias", function()
+        Assertions.Equals(type(DribbleSpec.expect), "function", "DribbleSpec.expect type")
         Assertions.Equals(type(_G.expect), "nil", "global expect")
 
         local seenCtxExpectType = nil
@@ -32,11 +32,11 @@ Dribble.describe("DribbleSpec Phase3 P3.1 expect toBe", { tags = { "unit", "phas
         Assertions.Equals(run.status, "passed", "run status")
     end)
 
-    Dribble.test("toBe passes on exact equality and fails with clear mismatch message", function()
-        Dribble.expect("alpha").toBe("alpha")
+    DribbleSpec.test("toBe passes on exact equality and fails with clear mismatch message", function()
+        DribbleSpec.expect("alpha").toBe("alpha")
 
         local err = captureError(function()
-            Dribble.expect("alpha").toBe("beta")
+            DribbleSpec.expect("alpha").toBe("beta")
         end)
 
         Assertions.Equals(type(err), "string", "toBe mismatch should throw")

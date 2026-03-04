@@ -1,9 +1,9 @@
-local Dribble = _G.Dribble or Ext.Require("Shared/DribbleSpec/init.lua")
+local DribbleSpec = _G.DribbleSpec or Ext.Require("Shared/DribbleSpec/init.lua")
 local Assertions = Ext.Require("Shared/DribbleSpec/Tests/Support/Assertions.lua")
 local RunnerHarness = Ext.Require("Shared/DribbleSpec/Tests/Support/RunnerHarness.lua")
 
-Dribble.describe("DribbleSpec Phase2 P2.3 context filtering", { tags = { "unit", "phase2", "filter" } }, function()
-    Dribble.test("includes untagged plus client-tagged tests for --context client", function()
+DribbleSpec.describe("DribbleSpec Phase2 P2.3 context filtering", { tags = { "unit", "phase2", "filter" } }, function()
+    DribbleSpec.test("includes untagged plus client-tagged tests for --context client", function()
         local trace = {}
 
         local run = RunnerHarness.Run(function(dsl)
@@ -35,7 +35,7 @@ Dribble.describe("DribbleSpec Phase2 P2.3 context filtering", { tags = { "unit",
         Assertions.Equals(#suite.tests, 2, "selected tests count")
     end)
 
-    Dribble.test("includes untagged plus server-tagged tests for --context server", function()
+    DribbleSpec.test("includes untagged plus server-tagged tests for --context server", function()
         local trace = {}
 
         local run = RunnerHarness.Run(function(dsl)

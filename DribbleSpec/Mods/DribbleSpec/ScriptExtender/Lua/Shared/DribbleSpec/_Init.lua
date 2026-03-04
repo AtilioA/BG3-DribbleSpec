@@ -7,4 +7,4 @@ if not ok then
     Ext.Utils.PrintWarning(string.format("[DribbleSpec] self-test preload skipped: %s", tostring(err)))
 end
 
-return Dribble
+return DribbleSpec

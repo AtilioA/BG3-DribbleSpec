@@ -1,4 +1,4 @@
-local Dribble = _G.Dribble or Ext.Require("Shared/DribbleSpec/init.lua")
+local DribbleSpec = _G.DribbleSpec or Ext.Require("Shared/DribbleSpec/init.lua")
 local Assertions = Ext.Require("Shared/DribbleSpec/Tests/Support/Assertions.lua")
 
 ---@param fn function
@@ -12,8 +12,8 @@ local function captureError(fn)
     return tostring(err)
 end
 
-Dribble.describe("DribbleSpec Phase4 P4.3 call subset match", { tags = { "unit", "phase4", "doubles" } }, function()
-    Dribble.test("toHaveBeenCalledWithMatch matches subset on any table argument in any call", function(ctx)
+DribbleSpec.describe("DribbleSpec Phase4 P4.3 call subset match", { tags = { "unit", "phase4", "doubles" } }, function()
+    DribbleSpec.test("toHaveBeenCalledWithMatch matches subset on any table argument in any call", function(ctx)
         local spy = ctx.mockFn()
         spy("ignored", {
             kind = "combat",

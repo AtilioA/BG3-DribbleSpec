@@ -1,14 +1,14 @@
-local Dribble = _G.Dribble or Ext.Require("Shared/DribbleSpec/init.lua")
+local DribbleSpec = _G.DribbleSpec or Ext.Require("Shared/DribbleSpec/init.lua")
 local Assertions = Ext.Require("Shared/DribbleSpec/Tests/Support/Assertions.lua")
 
-Dribble.describe("DribbleSpec Phase8 P8.2 RegisterTestGlobals", { tags = { "unit", "phase8", "consumer" } },
+DribbleSpec.describe("DribbleSpec Phase8 P8.2 RegisterTestGlobals", { tags = { "unit", "phase8", "consumer" } },
     function()
-        Dribble.test("framework RegisterTestGlobals entrypoints are available", function()
+        DribbleSpec.test("framework RegisterTestGlobals entrypoints are available", function()
             Assertions.Equals(type(rawget(_G, "RegisterTestGlobals")), "function", "global register function")
-            Assertions.Equals(type(Dribble.RegisterTestGlobals), "function", "Dribble register function")
+            Assertions.Equals(type(DribbleSpec.RegisterTestGlobals), "function", "DribbleSpec register function")
         end)
 
-        Dribble.test("RegisterTestGlobals adds public symbols into target namespace", function()
+        DribbleSpec.test("RegisterTestGlobals adds public symbols into target namespace", function()
             local target = RegisterTestGlobals()
 
             Assertions.Equals(type(target.describe), "function", "describe exposed")
@@ -21,7 +21,7 @@ Dribble.describe("DribbleSpec Phase8 P8.2 RegisterTestGlobals", { tags = { "unit
             Assertions.Equals(type(target.RegisterTestGlobals), "function", "RegisterTestGlobals exposed")
         end)
 
-        Dribble.test("RegisterTestGlobals returns fresh table snapshots", function()
+        DribbleSpec.test("RegisterTestGlobals returns fresh table snapshots", function()
             local first = RegisterTestGlobals()
             local second = RegisterTestGlobals()
 

@@ -1,9 +1,9 @@
-local Dribble = _G.Dribble or Ext.Require("Shared/DribbleSpec/init.lua")
+local DribbleSpec = _G.DribbleSpec or Ext.Require("Shared/DribbleSpec/init.lua")
 local Assertions = Ext.Require("Shared/DribbleSpec/Tests/Support/Assertions.lua")
 local RunnerHarness = Ext.Require("Shared/DribbleSpec/Tests/Support/RunnerHarness.lua")
 
-Dribble.describe("DribbleSpec Phase4 P4.6 isolation restore", { tags = { "unit", "phase4", "doubles" } }, function()
-    Dribble.test("restores patched methods across test boundaries including failure path", function()
+DribbleSpec.describe("DribbleSpec Phase4 P4.6 isolation restore", { tags = { "unit", "phase4", "doubles" } }, function()
+    DribbleSpec.test("restores patched methods across test boundaries including failure path", function()
         local shared = {
             sum = function(a, b)
                 return a + b

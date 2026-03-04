@@ -1,8 +1,8 @@
-local Dribble = _G.Dribble or Ext.Require("Shared/DribbleSpec/init.lua")
+local DribbleSpec = _G.DribbleSpec or Ext.Require("Shared/DribbleSpec/init.lua")
 local Assertions = Ext.Require("Shared/DribbleSpec/Tests/Support/Assertions.lua")
 
-Dribble.describe("DribbleSpec Phase6 P6.1 fixture api", { tags = { "unit", "phase6", "fixture" } }, function()
-    Dribble.test("ctx exposes fixture surface", function(ctx)
+DribbleSpec.describe("DribbleSpec Phase6 P6.1 fixture api", { tags = { "unit", "phase6", "fixture" } }, function()
+    DribbleSpec.test("ctx exposes fixture surface", function(ctx)
         Assertions.Equals(type(ctx.fixture), "table", "fixture table")
         Assertions.Equals(type(ctx.fixture.character), "function", "fixture.character")
         Assertions.Equals(type(ctx.fixture.item), "function", "fixture.item")

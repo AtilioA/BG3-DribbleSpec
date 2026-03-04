@@ -1,8 +1,8 @@
-local Dribble = _G.Dribble or Ext.Require("Shared/DribbleSpec/init.lua")
+local DribbleSpec = _G.DribbleSpec or Ext.Require("Shared/DribbleSpec/init.lua")
 local Assertions = Ext.Require("Shared/DribbleSpec/Tests/Support/Assertions.lua")
 
-Dribble.describe("DribbleSpec Phase4 P4.4 spyOn", { tags = { "unit", "phase4", "doubles" } }, function()
-    Dribble.test("ctx.spyOn wraps existing function, records calls, and preserves original behavior", function(ctx)
+DribbleSpec.describe("DribbleSpec Phase4 P4.4 spyOn", { tags = { "unit", "phase4", "doubles" } }, function()
+    DribbleSpec.test("ctx.spyOn wraps existing function, records calls, and preserves original behavior", function(ctx)
         local target = {
             sum = function(a, b)
                 return a + b

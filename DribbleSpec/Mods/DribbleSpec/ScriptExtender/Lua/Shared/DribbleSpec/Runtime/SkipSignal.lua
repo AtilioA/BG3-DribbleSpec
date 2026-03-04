@@ -1,11 +1,11 @@
 local SkipSignal = {}
 
----@class DribbleSkipSignal
+---@class DribbleSpecSkipSignal
 ---@field __dribbleSkip boolean
 ---@field reason string
 
 ---@param reason string
----@return DribbleSkipSignal
+---@return DribbleSpecSkipSignal
 function SkipSignal.New(reason)
     return {
         __dribbleSkip = true,

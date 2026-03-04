@@ -1,9 +1,9 @@
-local Dribble = _G.Dribble or Ext.Require("Shared/DribbleSpec/init.lua")
+local DribbleSpec = _G.DribbleSpec or Ext.Require("Shared/DribbleSpec/init.lua")
 local Assertions = Ext.Require("Shared/DribbleSpec/Tests/Support/Assertions.lua")
 local RunnerHarness = Ext.Require("Shared/DribbleSpec/Tests/Support/RunnerHarness.lua")
 
-Dribble.describe("DribbleSpec Phase6 P6.3 cleanup guarantees", { tags = { "unit", "phase6", "fixture" } }, function()
-    Dribble.test("runs fixture teardown for pass and failure paths", function()
+DribbleSpec.describe("DribbleSpec Phase6 P6.3 cleanup guarantees", { tags = { "unit", "phase6", "fixture" } }, function()
+    DribbleSpec.test("runs fixture teardown for pass and failure paths", function()
         local cleanupCount = 0
 
         local run = RunnerHarness.Run(function(dsl)

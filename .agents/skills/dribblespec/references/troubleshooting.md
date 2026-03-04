@@ -8,7 +8,7 @@
 
 ## No tests execute
 
-- Symptom: `dribble` runs with zero selected tests.
+- Symptom: `dribbles` runs with zero selected tests.
 - Common causes:
   - include file not loaded
   - filters exclude all tests (`--name`, `--tag`, `--context`)

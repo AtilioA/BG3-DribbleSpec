@@ -1,10 +1,10 @@
-local Dribble = _G.Dribble or Ext.Require("Shared/DribbleSpec/init.lua")
+local DribbleSpec = _G.DribbleSpec or Ext.Require("Shared/DribbleSpec/init.lua")
 local Assertions = Ext.Require("Shared/DribbleSpec/Tests/Support/Assertions.lua")
 local RunnerHarness = Ext.Require("Shared/DribbleSpec/Tests/Support/RunnerHarness.lua")
 local ConsoleReporter = Ext.Require("Shared/DribbleSpec/Reporters/ConsoleReporter.lua")
 
-Dribble.describe("DribbleSpec Console Reporter Formatting", { tags = { "unit", "phase1" } }, function()
-    Dribble.test("shows colored squares and all test outcomes", function()
+DribbleSpec.describe("DribbleSpec Console Reporter Formatting", { tags = { "unit", "phase1" } }, function()
+    DribbleSpec.test("shows colored squares and all test outcomes", function()
         local run = RunnerHarness.Run(function(dsl)
             dsl.describe("Reporter demo suite", function()
                 dsl.test("pass case", function()
@@ -35,7 +35,7 @@ Dribble.describe("DribbleSpec Console Reporter Formatting", { tags = { "unit", "
         Assertions.Contains(output, "Skipped (1):", "skipped count format")
     end)
 
-    Dribble.test("omits zero-count suite metrics", function()
+    DribbleSpec.test("omits zero-count suite metrics", function()
         local run = RunnerHarness.Run(function(dsl)
             dsl.describe("Only pass suite", function()
                 dsl.test("pass case", function()
@@ -50,7 +50,7 @@ Dribble.describe("DribbleSpec Console Reporter Formatting", { tags = { "unit", "
         Assertions.NotContains(suiteLine, "\x1b[38;2;255;214;10m■", "suite omits skipped metric")
     end)
 
-    Dribble.test("routes warnings through warning sink", function()
+    DribbleSpec.test("routes warnings through warning sink", function()
         local run = RunnerHarness.Run(function(dsl)
             dsl.describe("Reporter warning suite", function()
                 dsl.test("pass case", function()

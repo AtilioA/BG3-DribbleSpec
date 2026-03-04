@@ -178,7 +178,7 @@ After each test:
 - test-added subscriptions/listeners removed (when possible via wrappers).
 
 Workflow convention:
-- tests that intentionally mutate live world state (eg. real deletions) should use a dedicated `destructive` tag so consumers can opt in explicitly (`dribble --tag destructive`).
+- tests that intentionally mutate live world state (eg. real deletions) should use a dedicated `destructive` tag so consumers can opt in explicitly (`dribbles --tag destructive`).
 
 ## 7) Runner and Filtering
 
@@ -203,7 +203,7 @@ Required filters:
 ### 7.3 Console Entry
 
 Framework-owned command namespace:
-- `dribble`
+- `dribbles`
 
 Expected options:
 - `--name <pattern>`
@@ -271,14 +271,14 @@ Consumer namespace convenience:
 ## 10) Example Consumer Usage
 
 ```lua
-local Dribble = Ext.Require("Shared/DribbleSpec/init.lua")
+local DribbleSpec = Ext.Require("Shared/DribbleSpec/init.lua")
 
-Dribble.describe("Settings migration", { tags = { "runtime", "client" } }, function()
-    Dribble.beforeEach(function(ctx)
+DribbleSpec.describe("Settings migration", { tags = { "runtime", "client" } }, function()
+    DribbleSpec.beforeEach(function(ctx)
         ctx.requireClient()
     end)
 
-    Dribble.test("marks migration handled", function(ctx)
+    DribbleSpec.test("marks migration handled", function(ctx)
         local fn = ctx.mockFn(function() return true end)
         ctx.expect(fn()).toBe(true)
         ctx.expect(fn).toHaveBeenCalledTimes(1)
@@ -318,6 +318,6 @@ Resolved decisions:
 - JSON reporter only in V1.
 - Fixture provider order: pre-placed first, spawn fallback.
 - Explicit test includes in V1 (no auto-discovery).
-- Console command name: `dribble`.
-- Explicit include manifest filename: `DribbleTests.lua`.
+- Console command name: `dribbles`.
+- Explicit include manifest filename: `DribbleSpecTests.lua`.
 - Caller display name resolution: `Ext.Mod.GetMod(<moduleUUID>).Info.Name`.

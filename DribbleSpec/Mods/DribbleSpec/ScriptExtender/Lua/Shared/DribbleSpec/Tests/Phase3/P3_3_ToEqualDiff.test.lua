@@ -1,4 +1,4 @@
-local Dribble = _G.Dribble or Ext.Require("Shared/DribbleSpec/init.lua")
+local DribbleSpec = _G.DribbleSpec or Ext.Require("Shared/DribbleSpec/init.lua")
 local Assertions = Ext.Require("Shared/DribbleSpec/Tests/Support/Assertions.lua")
 
 ---@param fn function
@@ -12,8 +12,8 @@ local function captureError(fn)
     return tostring(err)
 end
 
-Dribble.describe("DribbleSpec Phase3 P3.3 toEqual diff", { tags = { "unit", "phase3", "expect" } }, function()
-    Dribble.test("toEqual passes for deep table equality with stable key ordering", function()
+DribbleSpec.describe("DribbleSpec Phase3 P3.3 toEqual diff", { tags = { "unit", "phase3", "expect" } }, function()
+    DribbleSpec.test("toEqual passes for deep table equality with stable key ordering", function()
         local expected = {
             name = "Astarion",
             stats = {
@@ -32,10 +32,10 @@ Dribble.describe("DribbleSpec Phase3 P3.3 toEqual diff", { tags = { "unit", "pha
             name = "Astarion",
         }
 
-        Dribble.expect(actual).toEqual(expected)
+        DribbleSpec.expect(actual).toEqual(expected)
     end)
 
-    Dribble.test("toEqual includes mismatch path and values when comparison fails", function()
+    DribbleSpec.test("toEqual includes mismatch path and values when comparison fails", function()
         local expected = {
             stats = {
                 hp = 35,
@@ -51,7 +51,7 @@ Dribble.describe("DribbleSpec Phase3 P3.3 toEqual diff", { tags = { "unit", "pha
         }
 
         local err = captureError(function()
-            Dribble.expect(actual).toEqual(expected)
+            DribbleSpec.expect(actual).toEqual(expected)
         end)
 
         Assertions.Equals(type(err), "string", "toEqual mismatch should throw")
@@ -61,7 +61,7 @@ Dribble.describe("DribbleSpec Phase3 P3.3 toEqual diff", { tags = { "unit", "pha
         Assertions.Contains(err, "actual=33", "actual value")
     end)
 
-    Dribble.test("toEqual handles self-referential tables safely", function()
+    DribbleSpec.test("toEqual handles self-referential tables safely", function()
         local expected = {
             name = "loop",
         }
@@ -72,6 +72,6 @@ Dribble.describe("DribbleSpec Phase3 P3.3 toEqual diff", { tags = { "unit", "pha
         }
         actual.self = actual
 
-        Dribble.expect(actual).toEqual(expected)
+        DribbleSpec.expect(actual).toEqual(expected)
     end)
 end)

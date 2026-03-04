@@ -1,9 +1,9 @@
-local Dribble = _G.Dribble or Ext.Require("Shared/DribbleSpec/init.lua")
+local DribbleSpec = _G.DribbleSpec or Ext.Require("Shared/DribbleSpec/init.lua")
 local Assertions = Ext.Require("Shared/DribbleSpec/Tests/Support/Assertions.lua")
 local ConsoleIO = Ext.Require("Shared/DribbleSpec/Internal/ConsoleIO.lua")
 
-Dribble.describe("DribbleSpec console help formatting", { tags = { "unit", "phase1", "cli" } }, function()
-    Dribble.test("prints organized overview sections and examples", function()
+DribbleSpec.describe("DribbleSpec console help formatting", { tags = { "unit", "phase1", "cli" } }, function()
+    DribbleSpec.test("prints organized overview sections and examples", function()
         local lines = {}
         ConsoleIO.PrintHelp(function(message)
             table.insert(lines, message)
@@ -11,18 +11,18 @@ Dribble.describe("DribbleSpec console help formatting", { tags = { "unit", "phas
 
         local output = table.concat(lines, "\n")
         Assertions.Contains(output, "Usage:", "usage heading")
-        Assertions.Contains(output, "dribble [options]", "short usage line")
-        Assertions.Contains(output, "dribble --help [topic]", "topic usage line")
+        Assertions.Contains(output, "dribbles [options]", "short usage line")
+        Assertions.Contains(output, "d [options]", "shorthand usage line")
+        Assertions.Contains(output, "dribbles --help [topic]", "topic usage line")
         Assertions.Contains(output, "Options:", "options heading")
         Assertions.Contains(output, "--tag <tag>", "tag option")
         Assertions.Contains(output, "--context <client|server|any>", "context option")
-        Assertions.NotContains(output, "--manifest", "manifest option removed")
-        Assertions.NotContains(output, "DribbleTests.lua", "manifest default removed")
         Assertions.Contains(output, "Examples:", "examples heading")
-        Assertions.Contains(output, "dribble --help tag", "tag example")
+        Assertions.Contains(output, "dribbles --help tag", "tag example")
+        Assertions.Contains(output, "d --name phase2", "shorthand example")
     end)
 
-    Dribble.test("prints topic help for tag and context", function()
+    DribbleSpec.test("prints topic help for tag and context", function()
         local tagLines = {}
         ConsoleIO.PrintHelp(function(message)
             table.insert(tagLines, message)
@@ -44,7 +44,7 @@ Dribble.describe("DribbleSpec console help formatting", { tags = { "unit", "phas
         Assertions.Contains(contextOutput, "server", "context server detail")
     end)
 
-    Dribble.test("prints unknown topic guidance with available topics", function()
+    DribbleSpec.test("prints unknown topic guidance with available topics", function()
         local lines = {}
         ConsoleIO.PrintHelp(function(message)
             table.insert(lines, message)

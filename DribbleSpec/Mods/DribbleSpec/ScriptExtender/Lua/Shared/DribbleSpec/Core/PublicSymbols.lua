@@ -1,10 +1,10 @@
----@class DribblePublicSymbolDefinition
+---@class DribbleSpecPublicSymbolDefinition
 ---@field name string
 ---@field resolver fun(api: table): any
 
 local PublicSymbols = {}
 
----@type DribblePublicSymbolDefinition[]
+---@type DribbleSpecPublicSymbolDefinition[]
 local SYMBOL_DEFINITIONS = {
     {
         name = "RegisterTestGlobals",

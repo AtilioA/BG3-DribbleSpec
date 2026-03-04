@@ -1,9 +1,9 @@
-local Dribble = _G.Dribble or Ext.Require("Shared/DribbleSpec/init.lua")
+local DribbleSpec = _G.DribbleSpec or Ext.Require("Shared/DribbleSpec/init.lua")
 local Assertions = Ext.Require("Shared/DribbleSpec/Tests/Support/Assertions.lua")
 local RuntimeHelpers = Ext.Require("Shared/DribbleSpec/Runtime/Helpers.lua")
 
-Dribble.describe("DribbleSpec Phase5 P5.7 tick driver guardrail", { tags = { "unit", "phase5", "runtime" } }, function()
-    Dribble.test("waitUntil advances by injected tick driver deterministically", function()
+DribbleSpec.describe("DribbleSpec Phase5 P5.7 tick driver guardrail", { tags = { "unit", "phase5", "runtime" } }, function()
+    DribbleSpec.test("waitUntil advances by injected tick driver deterministically", function()
         local tickCalls = 0
         local checks = 0
         local helpers = RuntimeHelpers.Create({

@@ -1,9 +1,9 @@
-local Dribble = _G.Dribble or Ext.Require("Shared/DribbleSpec/init.lua")
+local DribbleSpec = _G.DribbleSpec or Ext.Require("Shared/DribbleSpec/init.lua")
 local Assertions = Ext.Require("Shared/DribbleSpec/Tests/Support/Assertions.lua")
 
-Dribble.describe("DribbleSpec Phase8 P8.4 consumer call path", { tags = { "unit", "phase8", "consumer" } },
+DribbleSpec.describe("DribbleSpec Phase8 P8.4 consumer call path", { tags = { "unit", "phase8", "consumer" } },
     function()
-        Dribble.test("consumer can assign returned exports to custom namespace", function()
+        DribbleSpec.test("consumer can assign returned exports to custom namespace", function()
             local consumerDribbles = RegisterTestGlobals()
 
             Assertions.Equals(type(consumerDribbles), "table", "consumer namespace table")

@@ -1,9 +1,9 @@
----@class DribbleSandbox
+---@class DribbleSpecSandbox
 ---@field private _restorers function[]
 local Sandbox = {}
 Sandbox.__index = Sandbox
 
----@return DribbleSandbox
+---@return DribbleSpecSandbox
 function Sandbox.Create()
     return setmetatable({
         _restorers = {},

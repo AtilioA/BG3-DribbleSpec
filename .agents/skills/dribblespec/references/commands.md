@@ -1,14 +1,15 @@
 # DribbleSpec Command Matrix
 
-- All tests: `dribble`
-- Help: `dribble --help`
-- Help topic: `dribble --help context`
-- Name filter: `dribble --name "pattern"`
-- Tag filter (AND): `dribble --tag runtime --tag server`
-- Context filter: `dribble --context client`
-- Fail fast: `dribble --fail-fast`
-- With caller UUID metadata: `dribble --mod-uuid 00000000-0000-0000-0000-000000000000`
-- Reserved JSON path metadata: `dribble --json-out DribbleSpec/results.json`
+- All tests: `dribbles`
+- Shorthand: `d`
+- Help: `dribbles --help`
+- Help topic: `dribbles --help context`
+- Name filter: `dribbles --name "pattern"`
+- Tag filter (AND): `dribbles --tag runtime --tag server`
+- Context filter: `dribbles --context client`
+- Fail fast: `dribbles --fail-fast`
+- With caller UUID metadata: `dribbles --mod-uuid 00000000-0000-0000-0000-000000000000`
+- Reserved JSON path metadata: `dribbles --json-out DribbleSpec/results.json`
 
 ## Suggested execution order
 

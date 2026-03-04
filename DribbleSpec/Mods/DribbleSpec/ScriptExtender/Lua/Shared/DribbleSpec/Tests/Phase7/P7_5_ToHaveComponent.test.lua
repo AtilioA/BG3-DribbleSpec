@@ -1,4 +1,4 @@
-local Dribble = _G.Dribble or Ext.Require("Shared/DribbleSpec/init.lua")
+local DribbleSpec = _G.DribbleSpec or Ext.Require("Shared/DribbleSpec/init.lua")
 local Assertions = Ext.Require("Shared/DribbleSpec/Tests/Support/Assertions.lua")
 
 ---@param fn function
@@ -12,9 +12,9 @@ local function captureError(fn)
     return tostring(err)
 end
 
-Dribble.describe("DribbleSpec Phase7 P7.5 toHaveComponent", { tags = { "unit", "phase7", "expect", "entity" } },
+DribbleSpec.describe("DribbleSpec Phase7 P7.5 toHaveComponent", { tags = { "unit", "phase7", "expect", "entity" } },
     function()
-        Dribble.test("toHaveComponent passes when component exists", function()
+        DribbleSpec.test("toHaveComponent passes when component exists", function()
             local entityLike = {
                 GetComponent = function(_, componentName)
                     if componentName == "DisplayName" then
@@ -27,11 +27,11 @@ Dribble.describe("DribbleSpec Phase7 P7.5 toHaveComponent", { tags = { "unit", "
                 end,
             }
 
-            Dribble.expect(entityLike).toHaveComponent("DisplayName")
+            DribbleSpec.expect(entityLike).toHaveComponent("DisplayName")
         end)
 
-        Dribble.test("toHaveComponent works with EntityRef inputs", function()
-            local ref = Dribble.entityRef(function()
+        DribbleSpec.test("toHaveComponent works with EntityRef inputs", function()
+            local ref = DribbleSpec.entityRef(function()
                 return {
                     GetComponent = function(_, componentName)
                         if componentName == "Stats" then
@@ -45,12 +45,12 @@ Dribble.describe("DribbleSpec Phase7 P7.5 toHaveComponent", { tags = { "unit", "
                 }
             end)
 
-            Dribble.expect(ref).toHaveComponent("Stats")
+            DribbleSpec.expect(ref).toHaveComponent("Stats")
         end)
 
-        Dribble.test("toHaveComponent fails with clear matcher errors", function()
+        DribbleSpec.test("toHaveComponent fails with clear matcher errors", function()
             local missingComponentErr = captureError(function()
-                Dribble.expect({
+                DribbleSpec.expect({
                     GetComponent = function()
                         return nil
                     end,
@@ -61,7 +61,7 @@ Dribble.describe("DribbleSpec Phase7 P7.5 toHaveComponent", { tags = { "unit", "
             Assertions.Contains(missingComponentErr, "DisplayName", "missing component name")
 
             local invalidNameErr = captureError(function()
-                Dribble.expect({
+                DribbleSpec.expect({
                     GetComponent = function()
                         return {
                             Name = "any",

@@ -1,8 +1,8 @@
-local Dribble = _G.Dribble or Ext.Require("Shared/DribbleSpec/init.lua")
+local DribbleSpec = _G.DribbleSpec or Ext.Require("Shared/DribbleSpec/init.lua")
 local Assertions = Ext.Require("Shared/DribbleSpec/Tests/Support/Assertions.lua")
 
-Dribble.describe("DribbleSpec Phase7 P7.1 entityRef basics", { tags = { "unit", "phase7", "entity" } }, function()
-    Dribble.test("Dribble.entityRef resolves lazily from resolver", function()
+DribbleSpec.describe("DribbleSpec Phase7 P7.1 entityRef basics", { tags = { "unit", "phase7", "entity" } }, function()
+    DribbleSpec.test("DribbleSpec.entityRef resolves lazily from resolver", function()
         local currentEntity = {
             GetComponent = function(_, componentName)
                 if componentName == "DisplayName" then
@@ -15,11 +15,11 @@ Dribble.describe("DribbleSpec Phase7 P7.1 entityRef basics", { tags = { "unit", 
             end,
         }
 
-        local ref = Dribble.entityRef(function()
+        local ref = DribbleSpec.entityRef(function()
             return currentEntity
         end)
 
-        Dribble.expect(ref).toBeEntity()
+        DribbleSpec.expect(ref).toBeEntity()
 
         currentEntity = {
             GetComponent = function(_, componentName)
@@ -38,9 +38,9 @@ Dribble.describe("DribbleSpec Phase7 P7.1 entityRef basics", { tags = { "unit", 
         Assertions.Equals(displayName.Name, "second", "lazy re-resolution")
     end)
 
-    Dribble.test("Dribble.entityRef keeps GUID identity", function()
+    DribbleSpec.test("DribbleSpec.entityRef keeps GUID identity", function()
         local guid = "58a69333-40bf-8358-1d17-fff240d7fb12"
-        local ref = Dribble.entityRef(guid)
+        local ref = DribbleSpec.entityRef(guid)
 
         Assertions.Equals(ref:GetGuid(), guid, "stored guid")
     end)

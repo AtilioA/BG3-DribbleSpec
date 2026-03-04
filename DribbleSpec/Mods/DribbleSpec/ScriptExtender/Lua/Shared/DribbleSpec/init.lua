@@ -20,12 +20,12 @@ local SkipSignal = Ext.Require("Shared/DribbleSpec/Runtime/SkipSignal.lua")
 ---@field _VERSION string
 ---@field _PHASE integer
 ---@field _internal table
-local Dribble = {
+local DribbleSpec = {
     _VERSION = "0.8.0-phase8",
     _PHASE = 8,
 }
 
-_G.Dribble = Dribble
+_G.DribbleSpec = DribbleSpec
 
 local registry = Registry.Create()
 local runService = RunService.Create({
@@ -88,7 +88,11 @@ local function registerCommand()
         return
     end
 
-    Ext.RegisterConsoleCommand("dribble", function(...)
+    Ext.RegisterConsoleCommand("dribbles", function(...)
+        runFromArgs({ ... })
+    end)
+
+    Ext.RegisterConsoleCommand("d", function(...)
         runFromArgs({ ... })
     end)
 
@@ -99,19 +103,19 @@ local function notAvailable(name)
     error(string.format("DribbleSpec Phase 8: '%s' is not implemented yet.", name), 2)
 end
 
-ApiBinder.Bind(Dribble, registry)
+ApiBinder.Bind(DribbleSpec, registry)
 
-Dribble.Run = runService.Run
-Dribble.RunFromArgs = runFromArgs
-Dribble.expect = Expect.Expect
-Dribble.entityRef = EntityRef.Create
-Dribble.skip = SkipSignal.Throw
+DribbleSpec.Run = runService.Run
+DribbleSpec.RunFromArgs = runFromArgs
+DribbleSpec.expect = Expect.Expect
+DribbleSpec.entityRef = EntityRef.Create
+DribbleSpec.skip = SkipSignal.Throw
 local function registerTestGlobals(options)
     if options ~= nil then
         error("RegisterTestGlobals() does not accept arguments", 2)
     end
 
-    local symbols = PublicSymbols.Resolve(Dribble)
+    local symbols = PublicSymbols.Resolve(DribbleSpec)
     local exported = {}
     for _, symbolName in ipairs(PublicSymbols.Keys()) do
         exported[symbolName] = symbols[symbolName]
@@ -120,7 +124,7 @@ local function registerTestGlobals(options)
     return exported
 end
 
-Dribble.RegisterTestGlobals = registerTestGlobals
+DribbleSpec.RegisterTestGlobals = registerTestGlobals
 
 RegisterTestGlobals = registerTestGlobals
 
@@ -128,14 +132,14 @@ local globalRegisterTestGlobals = registerTestGlobals
 
 rawset(_G, "RegisterTestGlobals", globalRegisterTestGlobals)
 
-Dribble.ResetRegistry = function()
+DribbleSpec.ResetRegistry = function()
     registry:Clear()
 end
-Dribble.GetRegistry = function()
+DribbleSpec.GetRegistry = function()
     return registry
 end
 
-Dribble._internal = {
+DribbleSpec._internal = {
     registry = registry,
     notAvailable = notAvailable,
     expect = Expect.Expect,
@@ -152,4 +156,4 @@ Dribble._internal = {
 registerCommand()
 serverRunChannel.RegisterServerRunHandler()
 
-return Dribble
+return DribbleSpec

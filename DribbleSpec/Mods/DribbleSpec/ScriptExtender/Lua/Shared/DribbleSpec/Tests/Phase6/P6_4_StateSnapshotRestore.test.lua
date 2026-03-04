@@ -1,9 +1,9 @@
-local Dribble = _G.Dribble or Ext.Require("Shared/DribbleSpec/init.lua")
+local DribbleSpec = _G.DribbleSpec or Ext.Require("Shared/DribbleSpec/init.lua")
 local Assertions = Ext.Require("Shared/DribbleSpec/Tests/Support/Assertions.lua")
 local RunnerHarness = Ext.Require("Shared/DribbleSpec/Tests/Support/RunnerHarness.lua")
 
-Dribble.describe("DribbleSpec Phase6 P6.4 state snapshot restore", { tags = { "unit", "phase6", "fixture" } }, function()
-    Dribble.test("restores snapshot state across test boundaries", function()
+DribbleSpec.describe("DribbleSpec Phase6 P6.4 state snapshot restore", { tags = { "unit", "phase6", "fixture" } }, function()
+    DribbleSpec.test("restores snapshot state across test boundaries", function()
         local sharedState = {
             mode = "original",
         }
@@ -39,7 +39,7 @@ Dribble.describe("DribbleSpec Phase6 P6.4 state snapshot restore", { tags = { "u
         Assertions.Equals(run.summary.failed, 0, "failed count")
     end)
 
-    Dribble.test("manual state restore is idempotent", function()
+    DribbleSpec.test("manual state restore is idempotent", function()
         local sharedState = {
             value = 10,
         }

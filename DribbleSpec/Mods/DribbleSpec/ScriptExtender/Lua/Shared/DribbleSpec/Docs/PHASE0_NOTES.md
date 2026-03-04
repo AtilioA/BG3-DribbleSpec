@@ -7,16 +7,16 @@ Phase 0 intentionally does not include an automated test harness.
 1. Load the framework module:
    - `Ext.Require("Shared/DribbleSpec/init.lua")`
 2. Confirm command help:
-   - `dribble --help`
+   - `dribbles --help`
 3. Confirm empty run path:
-   - `dribble`
+   - `dribbles`
 4. Confirm manifest argument path is accepted:
-   - `dribble --manifest DribbleTests.lua`
+   - `dribbles --manifest DribbleSpecTests.lua`
 
 ## Current Behavior
 
-- Command `dribble` is registered on framework load.
-- Default include manifest is `DribbleTests.lua`.
+- Command `dribbles` is registered on framework load.
+- Default include manifest is `DribbleSpecTests.lua`.
 - Missing manifest is treated as a warning in Phase 0.
 - Phase 1 implemented runnable DSL and hook execution; see `Docs/PHASE1_PLAN.md` for active TDD scope.
 

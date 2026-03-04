@@ -1,4 +1,4 @@
-local Dribble = _G.Dribble or Ext.Require("Shared/DribbleSpec/init.lua")
+local DribbleSpec = _G.DribbleSpec or Ext.Require("Shared/DribbleSpec/init.lua")
 local Assertions = Ext.Require("Shared/DribbleSpec/Tests/Support/Assertions.lua")
 
 ---@param fn function
@@ -12,8 +12,8 @@ local function captureError(fn)
     return tostring(err)
 end
 
-Dribble.describe("DribbleSpec Phase5 P5.6 waitUntil behavior", { tags = { "unit", "phase5", "runtime" } }, function()
-    Dribble.test("ctx.waitUntil succeeds when predicate becomes true before timeout", function(ctx)
+DribbleSpec.describe("DribbleSpec Phase5 P5.6 waitUntil behavior", { tags = { "unit", "phase5", "runtime" } }, function()
+    DribbleSpec.test("ctx.waitUntil succeeds when predicate becomes true before timeout", function(ctx)
         local calls = 0
         local ok, elapsedTicks = ctx.waitUntil(function()
             calls = calls + 1
@@ -27,7 +27,7 @@ Dribble.describe("DribbleSpec Phase5 P5.6 waitUntil behavior", { tags = { "unit"
         Assertions.Equals(calls, 3, "predicate calls")
     end)
 
-    Dribble.test("ctx.waitUntil times out deterministically after timeoutTicks", function(ctx)
+    DribbleSpec.test("ctx.waitUntil times out deterministically after timeoutTicks", function(ctx)
         local calls = 0
         local err = captureError(function()
             ctx.waitUntil(function()

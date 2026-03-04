@@ -1,9 +1,9 @@
-local Dribble = _G.Dribble or Ext.Require("Shared/DribbleSpec/init.lua")
+local DribbleSpec = _G.DribbleSpec or Ext.Require("Shared/DribbleSpec/init.lua")
 local Assertions = Ext.Require("Shared/DribbleSpec/Tests/Support/Assertions.lua")
 local RunnerHarness = Ext.Require("Shared/DribbleSpec/Tests/Support/RunnerHarness.lua")
 
-Dribble.describe("DribbleSpec Phase7 P7.2 entityRef exposure", { tags = { "unit", "phase7", "entity" } }, function()
-    Dribble.test("ctx exposes entityRef helper", function()
+DribbleSpec.describe("DribbleSpec Phase7 P7.2 entityRef exposure", { tags = { "unit", "phase7", "entity" } }, function()
+    DribbleSpec.test("ctx exposes entityRef helper", function()
         local run = RunnerHarness.Run(function(dsl)
             dsl.describe("entityRef context suite", function()
                 dsl.test("ctx.entityRef exists", function(ctx)
@@ -31,7 +31,7 @@ Dribble.describe("DribbleSpec Phase7 P7.2 entityRef exposure", { tags = { "unit"
         Assertions.Equals(run.status, "passed", "nested run status")
     end)
 
-    Dribble.test("fixture handles include ref for resolvable entity fixtures", function()
+    DribbleSpec.test("fixture handles include ref for resolvable entity fixtures", function()
         local fakeEntity = {
             GetComponent = function(_, componentName)
                 if componentName == "DisplayName" then
@@ -70,7 +70,7 @@ Dribble.describe("DribbleSpec Phase7 P7.2 entityRef exposure", { tags = { "unit"
         Assertions.Equals(run.status, "passed", "nested run status")
     end)
 
-    Dribble.test("fixture handles keep ref nil when fixture is not entity-like", function()
+    DribbleSpec.test("fixture handles keep ref nil when fixture is not entity-like", function()
         local run = RunnerHarness.Run(function(dsl)
             dsl.describe("non entity fixture suite", function()
                 dsl.test("string fixture has no ref", function(ctx)

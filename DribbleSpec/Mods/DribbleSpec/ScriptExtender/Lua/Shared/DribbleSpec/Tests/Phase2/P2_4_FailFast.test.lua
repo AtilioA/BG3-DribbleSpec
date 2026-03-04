@@ -1,9 +1,9 @@
-local Dribble = _G.Dribble or Ext.Require("Shared/DribbleSpec/init.lua")
+local DribbleSpec = _G.DribbleSpec or Ext.Require("Shared/DribbleSpec/init.lua")
 local Assertions = Ext.Require("Shared/DribbleSpec/Tests/Support/Assertions.lua")
 local RunnerHarness = Ext.Require("Shared/DribbleSpec/Tests/Support/RunnerHarness.lua")
 
-Dribble.describe("DribbleSpec Phase2 P2.4 fail-fast", { tags = { "unit", "phase2", "runner" } }, function()
-    Dribble.test("stops after first failed test when --fail-fast is enabled", function()
+DribbleSpec.describe("DribbleSpec Phase2 P2.4 fail-fast", { tags = { "unit", "phase2", "runner" } }, function()
+    DribbleSpec.test("stops after first failed test when --fail-fast is enabled", function()
         local trace = {}
 
         local run = RunnerHarness.Run(function(dsl)
@@ -33,7 +33,7 @@ Dribble.describe("DribbleSpec Phase2 P2.4 fail-fast", { tags = { "unit", "phase2
         Assertions.Equals(suite.tests[1].name, "first fails", "recorded test")
     end)
 
-    Dribble.test("stops entire run after beforeAll failure when --fail-fast is enabled", function()
+    DribbleSpec.test("stops entire run after beforeAll failure when --fail-fast is enabled", function()
         local trace = {}
 
         local run = RunnerHarness.Run(function(dsl)

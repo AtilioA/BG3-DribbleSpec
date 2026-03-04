@@ -63,8 +63,9 @@ local function printOverview(printLine)
     printLine("DribbleSpec CLI")
     printLine("")
     printLine("Usage:")
-    printLine("  dribble [options]")
-    printLine("  dribble --help [topic]")
+    printLine("  dribbles [options]")
+    printLine("  d [options]")
+    printLine("  dribbles --help [topic]")
     printLine("")
     printLine("Options:")
     printLine("  -h, --help [topic]             Show overview help or detailed topic help")
@@ -79,15 +80,16 @@ local function printOverview(printLine)
     printLine("  --context any")
     printLine("")
     printLine("Topic help:")
-    printLine("  dribble --help tag")
-    printLine("  dribble --help context")
-    printLine("  dribble --help --name")
+    printLine("  dribbles --help tag")
+    printLine("  dribbles --help context")
+    printLine("  dribbles --help --name")
     printLine("")
     printLine("Examples:")
-    printLine("  dribble")
-    printLine("  dribble --name phase2")
-    printLine("  dribble --tag runtime --tag server")
-    printLine("  dribble --context server")
+    printLine("  dribbles")
+    printLine("  d --name phase2")
+    printLine("  dribbles --name phase2")
+    printLine("  dribbles --tag runtime --tag server")
+    printLine("  dribbles --context server")
 end
 
 ---@param printLine fun(message: string)
@@ -97,7 +99,7 @@ local function printTopicHelp(printLine, topic)
         printLine("Topic: name")
         printLine("  Syntax: --name <pattern>")
         printLine("  Matches test fullName by case-insensitive plain substring.")
-        printLine("  Example: dribble --name vendor")
+        printLine("  Example: dribbles --name vendor")
         return true
     end
 
@@ -106,7 +108,7 @@ local function printTopicHelp(printLine, topic)
         printLine("  Syntax: --tag <tag>")
         printLine("  repeatable: each --tag adds another required tag (AND semantics).")
         printLine("  Matching is case-insensitive across suite and test tags.")
-        printLine("  Example: dribble --tag runtime --tag server")
+        printLine("  Example: dribbles --tag runtime --tag server")
         return true
     end
 
@@ -117,7 +119,7 @@ local function printTopicHelp(printLine, topic)
         printLine("  client: include untagged + client-tagged; exclude server-only tagged tests.")
         printLine("  server: include untagged + server-tagged; exclude client-only tagged tests.")
         printLine("  Client sessions requesting --context server route execution to server context.")
-        printLine("  Example: dribble --context server")
+        printLine("  Example: dribbles --context server")
         return true
     end
 
@@ -125,7 +127,7 @@ local function printTopicHelp(printLine, topic)
         printLine("Topic: fail-fast")
         printLine("  Syntax: --fail-fast")
         printLine("  Stops execution after the first failure in the current run.")
-        printLine("  Example: dribble --fail-fast")
+        printLine("  Example: dribbles --fail-fast")
         return true
     end
 
@@ -133,7 +135,7 @@ local function printTopicHelp(printLine, topic)
         printLine("Topic: mod-uuid")
         printLine("  Syntax: --mod-uuid <uuid>")
         printLine("  Associates the run with a caller module UUID for metadata and diagnostics.")
-        printLine("  Example: dribble --mod-uuid 00000000-0000-0000-0000-000000000000")
+        printLine("  Example: dribbles --mod-uuid 00000000-0000-0000-0000-000000000000")
         return true
     end
 
@@ -141,7 +143,7 @@ local function printTopicHelp(printLine, topic)
         printLine("Topic: json-out")
         printLine("  Syntax: --json-out <path>")
         printLine("  Sets preferred JSON output path metadata for report workflows.")
-        printLine("  Example: dribble --json-out DribbleSpec/results.json")
+        printLine("  Example: dribbles --json-out DribbleSpec/results.json")
         return true
     end
 

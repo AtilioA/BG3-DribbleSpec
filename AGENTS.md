@@ -10,13 +10,14 @@ Commit and push autonomously: stage only related changes together; each commit m
 Use the bg3se-console-ops skill to access the SE console and run tests, or read logs.
 
 - Main framework/test command:
-  - `dribble`
+  - `dribbles`
+  - `d`
 - Show options/help:
-  - `dribble --help`
+  - `dribbles --help`
 - Run a single test (name match):
-  - `dribble --name "<test name or pattern>"`
+  - `dribbles --name "<test name or pattern>"`
 - Run subset by tag:
-  - `dribble --tag runtime`
+  - `dribbles --tag runtime`
 Etc.
 
 ## Required TDD Workflow
@@ -37,7 +38,7 @@ Use the tdd skill to implement the TDD workflow.
 - Module tables/classes: PascalCase (`Registry`, `ResultModel`, `Runner`).
 - Methods on module/class tables: PascalCase in this codebase (`AddSuite`, `Finalize`, `ParseArgs`).
 - Local variables/functions: `camelCase` if already established;
-- Globals should be intentional and sparse (`Dribble`, `RequireFiles`, print helpers).
+- Globals should be intentional and sparse (`DribbleSpec`, `RequireFiles`, print helpers).
 - Constants: uppercase-like field names where already established (`DEFAULT_PATH`).
 
 ### Formatting
@@ -95,6 +96,6 @@ If you hit unexpected runtime behavior, add a short “Surprise note” here wit
 
 Keep notes concise so future agents avoid repeated failure modes.
 
-Surprise note (2026-03-02): If `Shared/DribbleSpec/init.lua` tries to preload `DribbleTests.lua` during its own module initialization, test files that `Ext.Require("Shared/DribbleSpec/init.lua")` can recurse and hit `too many C levels`. Safe workaround: set `_G.Dribble` early and have test files use `_G.Dribble or Ext.Require(...)`.
+Surprise note (2026-03-02): If `Shared/DribbleSpec/init.lua` tries to preload `DribbleSpecTests.lua` during its own module initialization, test files that `Ext.Require("Shared/DribbleSpec/init.lua")` can recurse and hit `too many C levels`. Safe workaround: set `_G.DribbleSpec` early and have test files use `_G.DribbleSpec or Ext.Require(...)`.
 Surprise note (2026-03-03): Entity `DisplayName` component assertions are reliable on server context; client context can expose different component shape/access patterns. Safe workaround: run `DisplayName` integration assertions in server context (`ctx.requireServer()` / `--context server`).
 When following Red-Green-Refactor, make sure to run the tests after EACH step with `bg3se-console-ops`. You have to validate that the tests are actually running, then that the implementation fixes them, and then that the refactoring does not break them.

@@ -10,7 +10,7 @@ DribbleSpec is a reusable BG3SE Lua test framework that provides:
 - Runtime helpers (`requireClient`, `requireServer`, `nextTick`, `waitUntil`)
 - Fixture pipeline (preplaced first, spawn fallback)
 - Entity helpers (`entityRef`) and volatile-aware equality
-- IDE helpers (`DribbleIdeHelpers.lua` in `Docs/`)
+- IDE helpers (`DribblesIdeHelpers.lua` in `Docs/`)
 
 ## Quick start
 
@@ -53,7 +53,7 @@ D.describe("MyMod smoke", { tags = { "unit" } }, function()
 end)
 ```
 
-## Test loading setup (`DribbleTests.lua`)
+## Test loading setup (`DribbleSpecTests.lua`)
 
 Create test files in your consumer mod and load them explicitly:
 
@@ -66,12 +66,12 @@ Ext.Require("Shared/MyMod/Tests/Runtime.test.lua")
 
 Use DribbleSpec console command:
 
-- run all: `dribble`
-- help: `dribble --help`
-- name filter: `dribble --name "migration"`
-- tag filter: `dribble --tag runtime --tag server`
-- context: `dribble --context server`
-- fail fast: `dribble --fail-fast`
+- run all: `dribbles`
+- help: `dribbles --help`
+- name filter: `dribbles --name "migration"`
+- tag filter: `dribbles --tag runtime --tag server`
+- context: `dribbles --context server`
+- fail fast: `dribbles --fail-fast`
 
 ## Skipping tests
 
@@ -247,4 +247,4 @@ Other extension points:
 - entity component mismatch on client
   - move component assertions (especially `DisplayName`) to server context.
 - no tests executed
-  - verify `DribbleTests.lua` exists and includes your test init file.
+  - verify `DribbleSpecTests.lua` exists and includes your test init file.

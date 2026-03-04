@@ -91,8 +91,11 @@ function Options.ParseArgs(args)
     })
 
     local i = 1
-    if type(args[1]) == "string" and string.lower(args[1]) == "dribble" then
-        i = 2
+    if type(args[1]) == "string" then
+        local commandName = string.lower(args[1])
+        if commandName == "dribbles" or commandName == "d" then
+            i = 2
+        end
     end
 
     while i <= #args do
