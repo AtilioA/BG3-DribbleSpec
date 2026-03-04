@@ -14,6 +14,7 @@ local RunService = Ext.Require("Shared/DribbleSpec/Runtime/RunService.lua")
 local ServerRunChannel = Ext.Require("Shared/DribbleSpec/Runtime/ServerRunChannel.lua")
 local Expect = Ext.Require("Shared/DribbleSpec/Expect/Expect.lua")
 local EntityRef = Ext.Require("Shared/DribbleSpec/Entity/EntityRef.lua")
+local SkipSignal = Ext.Require("Shared/DribbleSpec/Runtime/SkipSignal.lua")
 
 ---@class DribbleSpecAPI
 ---@field _VERSION string
@@ -104,6 +105,7 @@ Dribble.Run = runService.Run
 Dribble.RunFromArgs = runFromArgs
 Dribble.expect = Expect.Expect
 Dribble.entityRef = EntityRef.Create
+Dribble.skip = SkipSignal.Throw
 local function registerTestGlobals(options)
     if options ~= nil then
         error("RegisterTestGlobals() does not accept arguments", 2)

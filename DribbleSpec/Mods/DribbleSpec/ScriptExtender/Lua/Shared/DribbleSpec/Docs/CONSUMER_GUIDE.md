@@ -36,6 +36,7 @@ After `RegisterTestGlobals()`, these symbols are available on the returned table
 - `afterAll`
 - `expect`
 - `entityRef`
+- `skip`
 
 `RegisterTestGlobals()` only returns a table of exports. Your mod decides where to assign it (`D`, `Dribbles`, local variable, etc.).
 
@@ -70,6 +71,37 @@ Use DribbleSpec console command:
 - tag filter: `dribble --tag runtime --tag server`
 - context: `dribble --context server`
 - fail fast: `dribble --fail-fast`
+
+## Skipping tests
+
+### Static (registration time)
+
+```lua
+D.test.skip("not ready", function() ... end)
+D.describe.skip("whole suite", function() ... end)
+-- or via metadata:
+D.test("skip via opts", { skip = true }, function() ... end)
+```
+
+### Dynamic (runtime)
+
+Use `D.skip(reason)` (standalone) or `ctx.skip(reason)` (inside test body) to skip based on runtime conditions:
+
+```lua
+local D = RegisterTestGlobals()
+
+D.describe("Optional integration", { tags = { "entity" } }, function()
+    D.test("resolves preplaced entity", function(ctx)
+        local entity = Ext.Entity.Get(MY_GUID)
+        if entity == nil then
+            D.skip("Entity not in current save")
+        end
+        ctx.expect(entity).toBeEntity()
+    end)
+end)
+```
+
+`ctx.requireClient()` and `ctx.requireServer()` are shorthand skips for context guards.
 
 ## Unit test example
 

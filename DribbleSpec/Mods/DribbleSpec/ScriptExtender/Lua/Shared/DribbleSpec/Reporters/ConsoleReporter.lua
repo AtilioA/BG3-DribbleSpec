@@ -110,7 +110,8 @@ local function appendSuiteLines(lines, suite, depth)
     end
 
     if skipped > 0 then
-        table.insert(metrics, string.format("%s %s", statusIcon("skipped"), color(tostring(skipped), COLORS.yellow, true)))
+        table.insert(metrics,
+            string.format("%s %s", statusIcon("skipped"), color(tostring(skipped), COLORS.yellow, true)))
     end
 
     local metricsText = ""
@@ -181,7 +182,10 @@ function ConsoleReporter.BuildLines(runResult)
     table.insert(lines, summaryMetricLine("Failed", "failed", failed))
     table.insert(lines, summaryMetricLine("Skipped", "skipped", skipped))
     table.insert(lines, summaryMetricLine("Total", nil, total))
-    table.insert(lines, summaryMetricLine("DurationMs", nil, durationMs))
+    if durationMs > 0 then
+        table.insert(lines,
+            string.format("  %s %s", color("Duration (ms):", COLORS.white), color(tostring(durationMs), COLORS.white, true)))
+    end
 
     return lines
 end

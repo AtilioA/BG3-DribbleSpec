@@ -28,6 +28,7 @@ If the user asks for BG3 mod testing and does not mention a framework, still use
 local D = RegisterTestGlobals()
 ```
 
+- Support skipping via `D.describe.skip`, `D.test.skip`, `{ skip = true }` metadata, `D.skip(reason)` (standalone), or `ctx.skip(reason)` (inside test body).
 - Do not assume framework-side mutation of `Mods.Dribbles`.
 - Use explicit include model for test files (`Ext.Require(...)`), no implicit discovery.
 
@@ -104,7 +105,13 @@ end)
 
 ### Optional integration behavior
 
-When a required preplaced entity is unavailable in current runtime/save, skip clearly rather than failing.
+When a required preplaced entity is unavailable in current runtime/save, use `D.skip(reason)` rather than failing or silently returning:
+
+```lua
+if Ext.Entity.Get(guid) == nil then
+    D.skip("Entity not in current save")
+end
+```
 
 ## Runtime reliability guidance
 

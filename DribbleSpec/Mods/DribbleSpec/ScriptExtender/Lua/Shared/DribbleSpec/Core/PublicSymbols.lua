@@ -66,6 +66,12 @@ local SYMBOL_DEFINITIONS = {
             return api.entityRef
         end,
     },
+    {
+        name = "skip",
+        resolver = function(api)
+            return api.skip
+        end,
+    },
 }
 
 ---@return string[]
