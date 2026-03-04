@@ -58,6 +58,7 @@ local function createContext(suite, test, runContext, options)
         end,
         requireClient = runtimeHelpers.requireClient,
         requireServer = runtimeHelpers.requireServer,
+        skip = SkipSignal.Throw,
         nextTick = runtimeHelpers.nextTick,
         waitUntil = runtimeHelpers.waitUntil,
         fixture = fixtureManager:BuildApi(),

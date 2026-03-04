@@ -1,0 +1,37 @@
+local DribbleSpec = _G.DribbleSpec or Ext.Require("Shared/DribbleSpec/init.lua")
+local Assertions = Ext.Require("Shared/DribbleSpec/Tests/Support/Assertions.lua")
+local RunnerHarness = Ext.Require("Shared/DribbleSpec/Tests/Support/RunnerHarness.lua")
+
+DribbleSpec.describe("DribbleSpec Phase5 P5.8 ctx.skip", { tags = { "unit", "phase5", "runtime" } }, function()
+    DribbleSpec.test("ctx.skip is exposed on test context", function()
+        local observedSkipType = nil
+
+        local run = RunnerHarness.Run(function(dsl)
+            dsl.describe("ctx.skip exposure suite", function()
+                dsl.test("exposes skip helper", function(ctx)
+                    observedSkipType = type(ctx.skip)
+                end)
+            end)
+        end)
+
+        Assertions.Equals(run.status, "passed", "run status")
+        Assertions.Equals(run.summary.passed, 1, "passed count")
+        Assertions.Equals(observedSkipType, "function", "ctx.skip type")
+    end)
+
+    DribbleSpec.test("ctx.skip marks current test as skipped", function()
+        local run = RunnerHarness.Run(function(dsl)
+            dsl.describe("ctx.skip semantics suite", function()
+                dsl.test("skips intentionally", function(ctx)
+                    ctx.skip("intentional runtime skip")
+                end)
+            end)
+        end)
+
+        Assertions.Equals(run.status, "passed", "run status")
+        Assertions.Equals(run.summary.passed, 0, "passed count")
+        Assertions.Equals(run.summary.failed, 0, "failed count")
+        Assertions.Equals(run.summary.skipped, 1, "skipped count")
+        Assertions.Contains(run.suites[1].tests[1].skipReason, "intentional runtime skip", "skip reason")
+    end)
+end)
