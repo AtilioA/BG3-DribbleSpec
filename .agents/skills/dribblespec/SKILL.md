@@ -1,6 +1,6 @@
 ---
 name: dribblespec
-description: Use this skill whenever a request involves BG3SE mod testing with DribbleSpec: creating or migrating tests, wiring `RegisterTestGlobals()`, using `describe/test/expect`, running `dribbles` filters, debugging runtime or entity failures, or fixing client/server flakiness. Trigger even if the user only says "BG3 tests" or "dribbles". Skip this skill for unrelated gameplay features or general Lua code with no test setup/execution work.
+description: Use this skill whenever a request involves BG3SE mod testing with DribbleSpec - creating or migrating tests, wiring `RegisterTestGlobals()`, using `describe/test/expect`, debugging runtime or entity failures. Trigger even if the user only says "BG3 tests" or "dribbles".
 ---
 
 # DribbleSpec Agent Skill
