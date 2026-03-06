@@ -85,7 +85,7 @@ Ext.Require("Shared/MyMod/Tests/Runtime.test.lua")
 
 ### Entity userdata lifetime (Context7-verified)
 
-- BG3SE `userdata` objects are scope/lifetime-bound; they are valid during current Lua call, but may expire afterwards.
+- BG3SE `userdata` objects are scope/lifetime-bound; they are valid during current Lua call, but may expire afterwards. `Osi.*` call targets are `userdata` in BG3SE, not Lua functions, so DribbleSpec `ctx.stub` cannot patch them directly; stub module wrapper methods instead.
 - Avoid caching component userdata (or nested userdata like `entity.SpellBook.Spells[...]`) across ticks/events.
 - Accessing expired userdata can raise errors like: `Attempted to read object ... whose lifetime has expired`.
 - Persist stable identity only (GUID / NetId), then re-resolve when needed (`ctx.entityRef(...)` / `D.entityRef(...)`, or fresh `Ext.Entity.Get(...)`). DribbleSpec provides `ctx.entityRef` and `D.entityRef` helpers for this, and will automatically resolve GUIDs to entities when needed (instead of caching expired handles).
