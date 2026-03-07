@@ -74,7 +74,7 @@ local function printOverview(printLine)
     printLine("  --context <client|server|any>  Filter by context tag semantics (default: any)")
     printLine("  --fail-fast                    Stop run after first failure")
     printLine("  -v, --verbose                  Print assertion and hook details")
-    printLine("  --mod-uuid <uuid>              Caller module UUID for run metadata")
+    printLine("  --mod-uuid <uuid>              Filter run to the owner module UUID")
     printLine("")
     printLine("Defaults:")
     printLine("  --context any")
@@ -142,7 +142,7 @@ local function printTopicHelp(printLine, topic)
     if topic == "mod-uuid" then
         printLine("Topic: mod-uuid")
         printLine("  Syntax: --mod-uuid <uuid>")
-        printLine("  Associates the run with a caller module UUID for metadata and diagnostics.")
+        printLine("  Filters the run to tests registered with that owner module UUID.")
         printLine("  Example: dribbles --mod-uuid 00000000-0000-0000-0000-000000000000")
         return true
     end

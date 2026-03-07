@@ -26,6 +26,17 @@ DribbleSpec.describe("DribbleSpec Phase8 P8.3 RegisterTestGlobals side effects",
             Assertions.Contains(err, "expects a table", "argument validation message")
         end)
 
+        DribbleSpec.test("RegisterTestGlobals commandAlias requires explicit ownerModuleUUID", function()
+            local ok, err = xpcall(function()
+                RegisterTestGlobals({
+                    commandAlias = "mytests",
+                })
+            end, debug.traceback)
+
+            Assertions.Equals(ok, false, "missing owner status")
+            Assertions.Contains(err, "commandAlias requires ownerModuleUUID", "missing owner message")
+        end)
+
         DribbleSpec.test("RegisterTestGlobals commandAlias registers once", function()
             local originalAliasRegistry = rawget(_G, "__DRIBBLESPEC_CONSUMER_COMMAND_ALIASES")
 

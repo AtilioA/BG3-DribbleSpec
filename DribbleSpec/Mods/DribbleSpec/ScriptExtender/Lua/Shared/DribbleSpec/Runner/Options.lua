@@ -129,7 +129,7 @@ function Options.ParseArgs(args)
             options.context = string.lower(tostring(args[i + 1] or "any"))
             i = i + 1
         elseif token == "--mod-uuid" then
-            options.callerModuleUUID = tostring(args[i + 1] or "")
+            options.ownerModuleUUID = tostring(args[i + 1] or "")
             i = i + 1
         else
             table.insert(options.unknownArgs, token)

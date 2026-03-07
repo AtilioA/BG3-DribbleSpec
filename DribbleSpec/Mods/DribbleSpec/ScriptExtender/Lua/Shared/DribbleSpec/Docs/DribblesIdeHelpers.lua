@@ -86,16 +86,16 @@
 ---@field RegisterTestGlobals fun(options?: DribbleSpecRegisterOptions): DribbleSpecGlobals Returns the DribbleSpec API symbols
 
 ---@class DribbleSpecRegisterOptions
----@field ownerModuleUUID? string Defaults to current `ModuleUUID` when available
+---@field ownerModuleUUID? string Defaults to current `ModuleUUID` when available; set explicitly when using `commandAlias`
 ---@field globalTags? string[] Appended to every `describe/test` metadata tags array
----@field commandAlias? string Optional extra console command that runs this mod's tests only
+---@field commandAlias? string Optional extra console command that runs this mod's tests only; requires explicit `ownerModuleUUID`
 
 ---@param options? DribbleSpecRegisterOptions
 ---@return DribbleSpecGlobals
 function RegisterTestGlobals(options) end
 
 --- RegisterTestGlobals is the primary entrypoint for consumers.
---- Suggested usage: `D = RegisterTestGlobals({ commandAlias = "mytests" })`
+--- Suggested usage: `D = RegisterTestGlobals({ ownerModuleUUID = ModuleUUID, commandAlias = "mytests" })`
 ---@param options? DribbleSpecRegisterOptions
 ---@return DribbleSpecGlobals
 function Mods.Dribbles.RegisterTestGlobals(options) end

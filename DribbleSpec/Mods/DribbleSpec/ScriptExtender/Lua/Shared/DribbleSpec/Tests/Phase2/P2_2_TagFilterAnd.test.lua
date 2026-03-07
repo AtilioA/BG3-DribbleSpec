@@ -65,4 +65,14 @@ DribbleSpec.describe("DribbleSpec Phase2 P2.2 tag filtering", { tags = { "unit",
         Assertions.Equals(run.suites[1].name, "mod B suite", "selected suite name")
         Assertions.Equals(run.suites[1].tests[1].name, "mod B test", "selected test name")
     end)
+
+    DribbleSpec.test("parses --mod-uuid into ownerModuleUUID", function()
+        local parsed = DribbleSpec._internal.parseOptions({
+            "dribbles",
+            "--mod-uuid",
+            "mod-b",
+        })
+
+        Assertions.Equals(parsed.ownerModuleUUID, "mod-b", "parsed owner module uuid")
+    end)
 end)

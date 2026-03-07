@@ -201,7 +201,8 @@ local function normalizeRegisterOptions(options)
         commandAlias = nil,
     }
 
-    local ownerModuleUUID = options.ownerModuleUUID
+    local explicitOwnerModuleUUID = options.ownerModuleUUID
+    local ownerModuleUUID = explicitOwnerModuleUUID
     if ownerModuleUUID == nil and type(ModuleUUID) == "string" and ModuleUUID ~= "" then
         ownerModuleUUID = ModuleUUID
     end
@@ -245,6 +246,10 @@ local function normalizeRegisterOptions(options)
         end
 
         normalized.commandAlias = alias
+
+        if explicitOwnerModuleUUID == nil then
+            error("RegisterTestGlobals(options) commandAlias requires ownerModuleUUID to be set explicitly", 3)
+        end
     end
 
     return normalized
