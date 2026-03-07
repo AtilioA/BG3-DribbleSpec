@@ -22,9 +22,6 @@ local HELP_TOPIC_ALIASES = {
     ["mod-uuid"] = "mod-uuid",
     ["--mod-uuid"] = "mod-uuid",
     ["moduuid"] = "mod-uuid",
-    ["json-out"] = "json-out",
-    ["--json-out"] = "json-out",
-    ["jsonout"] = "json-out",
     ["verbose"] = "verbose",
     ["--verbose"] = "verbose",
     ["-v"] = "verbose",
@@ -133,9 +130,6 @@ function Options.ParseArgs(args)
             i = i + 1
         elseif token == "--mod-uuid" then
             options.callerModuleUUID = tostring(args[i + 1] or "")
-            i = i + 1
-        elseif token == "--json-out" then
-            options.jsonOut = tostring(args[i + 1] or "")
             i = i + 1
         else
             table.insert(options.unknownArgs, token)

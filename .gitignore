@@ -45,3 +45,8 @@ output/
 *.pak
 .vscode/
 Reference Tests/
+.agents/
+AGENTS.md
+DribbleSpec.code-workspace
+symlink.bat
+scripts/symlink-dribblespec-skill.ps1

@@ -18,6 +18,7 @@ DribbleSpec.describe("DribbleSpec console help formatting", { tags = { "unit", "
         Assertions.Contains(output, "--tag <tag>", "tag option")
         Assertions.Contains(output, "--context <client|server|any>", "context option")
         Assertions.Contains(output, "-v, --verbose", "verbose option")
+        Assertions.NotContains(output, "json-out", "json output hidden")
         Assertions.Contains(output, "Examples:", "examples heading")
         Assertions.Contains(output, "dribbles --help tag", "tag example")
         Assertions.Contains(output, "d --name phase2", "shorthand example")

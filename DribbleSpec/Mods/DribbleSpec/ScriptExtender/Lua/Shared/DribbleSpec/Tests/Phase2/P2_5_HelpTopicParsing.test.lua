@@ -40,6 +40,13 @@ DribbleSpec.describe("DribbleSpec Phase2 P2.5 help topic parsing", { tags = { "u
         Assertions.Equals(options.unknownArgs[2], "MyTests.lua", "unknown value")
     end)
 
+    DribbleSpec.test("treats hidden json-out option as unknown args", function()
+        local options = DribbleSpec._internal.parseOptions({ "dribbles", "--json-out", "results.json" })
+        Assertions.Equals(#options.unknownArgs, 2, "unknown args count")
+        Assertions.Equals(options.unknownArgs[1], "--json-out", "unknown option")
+        Assertions.Equals(options.unknownArgs[2], "results.json", "unknown value")
+    end)
+
     DribbleSpec.test("parses --verbose and -v flags", function()
         local longForm = DribbleSpec._internal.parseOptions({ "dribbles", "--verbose" })
         Assertions.Equals(longForm.verbose, true, "long flag")

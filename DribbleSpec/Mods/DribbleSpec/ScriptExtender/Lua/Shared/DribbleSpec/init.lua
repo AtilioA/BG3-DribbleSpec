@@ -266,10 +266,6 @@ local function registerCommand()
     rawset(_G, "__DRIBBLESPEC_COMMAND_REGISTERED", true)
 end
 
-local function notAvailable(name)
-    error(string.format("DribbleSpec Phase 8: '%s' is not implemented yet.", name), 2)
-end
-
 ApiBinder.Bind(DribbleSpec, registry)
 
 DribbleSpec.Run = runService.Run
@@ -344,7 +340,6 @@ end
 
 DribbleSpec._internal = {
     registry = registry,
-    notAvailable = notAvailable,
     expect = Expect.Expect,
     parseOptions = Options.ParseArgs,
     normalizeOptions = Options.Normalize,

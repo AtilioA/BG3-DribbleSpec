@@ -7,7 +7,6 @@ local HELP_TOPICS = {
     "fail-fast",
     "verbose",
     "mod-uuid",
-    "json-out",
 }
 
 local HELP_TOPIC_ALIASES = {
@@ -29,9 +28,6 @@ local HELP_TOPIC_ALIASES = {
     ["mod-uuid"] = "mod-uuid",
     ["--mod-uuid"] = "mod-uuid",
     ["moduuid"] = "mod-uuid",
-    ["json-out"] = "json-out",
-    ["--json-out"] = "json-out",
-    ["jsonout"] = "json-out",
 }
 
 ---@param topic string|nil
@@ -79,7 +75,6 @@ local function printOverview(printLine)
     printLine("  --fail-fast                    Stop run after first failure")
     printLine("  -v, --verbose                  Print assertion and hook details")
     printLine("  --mod-uuid <uuid>              Caller module UUID for run metadata")
-    printLine("  --json-out <path>              Reserved output path for JSON report metadata")
     printLine("")
     printLine("Defaults:")
     printLine("  --context any")
@@ -149,14 +144,6 @@ local function printTopicHelp(printLine, topic)
         printLine("  Syntax: --mod-uuid <uuid>")
         printLine("  Associates the run with a caller module UUID for metadata and diagnostics.")
         printLine("  Example: dribbles --mod-uuid 00000000-0000-0000-0000-000000000000")
-        return true
-    end
-
-    if topic == "json-out" then
-        printLine("Topic: json-out")
-        printLine("  Syntax: --json-out <path>")
-        printLine("  Sets preferred JSON output path metadata for report workflows.")
-        printLine("  Example: dribbles --json-out DribbleSpec/results.json")
         return true
     end
 

@@ -30,11 +30,11 @@ local D = RegisterTestGlobals({
     commandAlias = "mytests",
 })
 
-This will:
-1. Register a console command `!mytests` that runs only your mod tests
-2. Tag all your tests with `mymod` so they can be filtered by `dribbles --tag mymod`.
-
 ```
+
+This will:
+1. Register a console command `mytests` that runs only your mod tests
+2. Tag all your tests with `mymod` so they can be filtered by `dribbles --tag mymod`.
 
 This returns a symbol table with all relevant exports.
 
@@ -69,14 +69,17 @@ D.describe("MyMod smoke", { tags = { "unit" } }, function()
 end)
 ```
 
-## Test loading setup (`DribbleSpecTests.lua`)
+## Test loading setup
 
-Create test files in your consumer mod and load them explicitly:
+DribbleSpec does not auto-discover consumer tests. Create a small init file for your test suite and load it explicitly when you want tests registered:
 
 ```lua
+-- Shared/MyMod/Tests/_Init.lua
 Ext.Require("Shared/MyMod/Tests/Smoke.test.lua")
 Ext.Require("Shared/MyMod/Tests/Runtime.test.lua")
 ```
+
+Then require that test init file from your mod's own debug bootstrap, dev-only init path, or other explicit entrypoint before running `dribbles`.
 
 ## Running tests
 
@@ -236,7 +239,7 @@ Use runner options to plug custom fixture behavior:
 
 ```lua
 local D = RegisterTestGlobals()
-local run = D.Run({
+local run = D.RunMine({
     fixtureProviders = {
         {
             name = "mod-preplaced",
@@ -267,4 +270,4 @@ Other extension points:
 - entity component mismatch on client
   - move component assertions (especially `DisplayName`) to server context.
 - no tests executed
-  - verify `DribbleSpecTests.lua` exists and includes your test init file.
+  - verify your test init file is loaded before running `dribbles`.

@@ -210,13 +210,14 @@ Expected options:
 - `--tag <tag>` (repeatable)
 - `--context <client|server|any>`
 - `--fail-fast`
-- `--json-out <json_filename>`
 
-## 8) JSON Reporter (V1 only reporter)
+## 8) Deferred JSON Reporter
+
+JSON reporting remains a future design target and is intentionally not exposed in the current CLI.
 
 ### 8.1 Default Output Path
 
-If `--json-out` is omitted, DribbleSpec writes to:
+If JSON reporting is enabled in a future release without an explicit output override, DribbleSpec writes to:
 - `DribbleSpec/<caller_modname>/results_<file-safe_ISO8601_timestamp>.json`
 
 `<caller_modname>` is the invoking/consumer mod identifier (human-readable mod name preferred).
@@ -319,5 +320,5 @@ Resolved decisions:
 - Fixture provider order: pre-placed first, spawn fallback.
 - Explicit test includes in V1 (no auto-discovery).
 - Console command name: `dribbles`.
-- Explicit include manifest filename: `DribbleSpecTests.lua`.
+- Consumer tests are loaded through an explicit mod-controlled init file.
 - Caller display name resolution: `Ext.Mod.GetMod(<moduleUUID>).Info.Name`.
