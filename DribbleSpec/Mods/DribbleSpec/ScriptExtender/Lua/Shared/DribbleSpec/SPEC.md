@@ -266,8 +266,8 @@ DribbleSpec must remain mod-agnostic:
 - consumer mods opt in by loading DribbleSpec and registering tests.
 
 Consumer namespace convenience:
-- DribbleSpec exposes global `RegisterTestGlobals()`.
-- `RegisterTestGlobals()` returns a table of test globals so consumer mods can assign it to their own namespace (eg. `Mods.Dribbles = RegisterTestGlobals()`).
+- DribbleSpec exposes `RegisterTestGlobals(options?)` as both a global and `DribbleSpec.RegisterTestGlobals(options?)`.
+- Each call returns a fresh table of test globals so consumer mods can assign it to their own namespace (eg. `local D = RegisterTestGlobals()` or `Mods.Dribbles = RegisterTestGlobals()`).
 
 ## 10) Example Consumer Usage
 

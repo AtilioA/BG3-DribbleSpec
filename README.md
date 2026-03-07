@@ -10,7 +10,7 @@ It gives consumer mods a small test DSL (`describe`, `test`, hooks), `expect` ma
 2. In your test files, register the public API:
 
 ```lua
-local D = Mods.Dribbles.RegisterTestGlobals({
+D = Mods.Dribbles.RegisterTestGlobals({
     ownerModuleUUID = ModuleUUID,
     globalTags = { "mymod" },
     commandAlias = "mytests",
@@ -20,7 +20,7 @@ local D = Mods.Dribbles.RegisterTestGlobals({
 3. Write a minimal test:
 
 ```lua
-local D = Mods.Dribbles.RegisterTestGlobals()
+D = Mods.Dribbles.RegisterTestGlobals()
 
 D.describe("MyMod smoke", { tags = { "unit" } }, function()
     D.test("basic truthiness", function()

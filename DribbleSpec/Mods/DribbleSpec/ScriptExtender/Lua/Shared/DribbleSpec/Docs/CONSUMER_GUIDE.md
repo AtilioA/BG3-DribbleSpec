@@ -15,7 +15,7 @@ DribbleSpec is a reusable BG3SE Lua test framework that provides:
 ## Quick start
 
 1. Ensure DribbleSpec is loaded in your mod load order.
-2. Call `RegisterTestGlobals()` and assign the returned table to your namespace:
+2. Call `RegisterTestGlobals(options?)` and assign the returned table wherever you want to use it:
 
 ```lua
 local D = RegisterTestGlobals()
@@ -36,7 +36,7 @@ This will:
 1. Register a console command `mytests` that runs only your mod tests
 2. Tag all your tests with `mymod` so they can be filtered by `dribbles --tag mymod`.
 
-This returns a symbol table with all relevant exports.
+This returns a fresh symbol table with all relevant exports.
 
 ## Exported symbols
 
@@ -55,7 +55,14 @@ After `RegisterTestGlobals()`, these symbols are available on the returned table
 - `skip`
 - `RunMine`
 
-`RegisterTestGlobals()` only returns a table of exports. Your mod decides where to assign it (`D`, `Dribbles`, local variable, etc.).
+`RegisterTestGlobals(options?)` accepts an optional table and returns a fresh export table each time. Your mod decides where to assign it (`D`, `Dribbles`, local variable, etc.).
+
+Framework entrypoints:
+
+- global `RegisterTestGlobals(options?)`
+- `DribbleSpec.RegisterTestGlobals(options?)`
+
+DribbleSpec does not create `Mods.Dribbles` for you.
 
 ## Minimal test file example
 
