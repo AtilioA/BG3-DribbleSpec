@@ -40,7 +40,6 @@ luac.out
 *.hex
 
 ignore/
-!ignore/.gitkeep
 output/
 *.pak
 .vscode/
