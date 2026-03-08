@@ -332,10 +332,6 @@ DribbleSpec.RegisterTestGlobals = registerTestGlobals
 
 RegisterTestGlobals = registerTestGlobals
 
-local globalRegisterTestGlobals = registerTestGlobals
-
-rawset(_G, "RegisterTestGlobals", globalRegisterTestGlobals)
-
 DribbleSpec.ResetRegistry = function()
     registry:Clear()
 end
