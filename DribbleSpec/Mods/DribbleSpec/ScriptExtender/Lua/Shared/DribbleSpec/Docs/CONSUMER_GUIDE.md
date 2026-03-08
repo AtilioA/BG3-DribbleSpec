@@ -1,16 +1,19 @@
 # DribbleSpec Guide
 
+
+
 ## What DribbleSpec provides
 
-DribbleSpec is a reusable BG3SE Lua test framework that provides:
+[DribbleSpec](https://www.nexusmods.com/baldursgate3/mods/21808) is a reusable BG3SE Lua test framework that provides:
 
 - Jest-like test DSL (`describe`, `test`, hooks)
-- Assertions (`expect`, core + entity domain matchers)
-- Doubles (`mockFn`, `spyOn`, `stub` via test `ctx`)
+- Assertions (`expect`, core + entity matchers)
+- Doubles (`mockFn`, `spyOn`, `stub`, via test `ctx`)
 - Runtime helpers (`requireClient`, `requireServer`, `nextTick`, `waitUntil`)
 - Fixture pipeline (preplaced first, spawn fallback)
-- Entity helpers (`entityRef`) and volatile-aware equality
-- IDE helpers (`DribblesIdeHelpers.lua` in `Docs/`)
+- Entity helpers (`entityRef`)
+- (Some advanced features in development)
+- IDE helpers ([`DribblesIdeHelpers.lua`](https://raw.githubusercontent.com/AtilioA/DribbleSpec/refs/heads/main/DribbleSpec/Mods/DribbleSpec/ScriptExtender/Lua/Shared/DribbleSpec/Docs/DribblesIdeHelpers.lua))
 
 ## Quick start
 
@@ -25,24 +28,23 @@ You can configure one-time defaults for your mod:
 
 ```lua
 local D = RegisterTestGlobals({
-    ownerModuleUUID = ModuleUUID,
     globalTags = { "mymod" },
     commandAlias = "mytests",
+    ownerModuleUUID = ModuleUUID
 })
 
 ```
 
 This will:
-1. Register a console command `mytests` that runs only your mod tests
-2. Tag all your tests with `mymod` so they can be filtered by `dribbles --tag mymod`.
+1. Register a console command `!mytests` that runs only your mod's tests;
+2. Tag all your tests with `mymod` so they can be filtered by `dribbles --tag mymod`;
 
-This returns a fresh symbol table with all relevant exports.
+This returns a fresh symbol table with all relevant exports:
 
 ## Exported symbols
 
-After `RegisterTestGlobals()`, these symbols are available on the returned table:
+`RegisterTestGlobals()` will return a table with:
 
-- `RegisterTestGlobals`
 - `describe`
 - `test`
 - `it`
@@ -56,13 +58,6 @@ After `RegisterTestGlobals()`, these symbols are available on the returned table
 - `RunMine`
 
 `RegisterTestGlobals(options?)` accepts an optional table and returns a fresh export table each time. Your mod decides where to assign it (`D`, `Dribbles`, local variable, etc.).
-
-Framework entrypoints:
-
-- global `RegisterTestGlobals(options?)`
-- `DribbleSpec.RegisterTestGlobals(options?)`
-
-DribbleSpec does not create `Mods.Dribbles` for you.
 
 ## Minimal test file example
 
@@ -92,16 +87,16 @@ Then require that test init file from your mod's own debug bootstrap, dev-only i
 
 Use DribbleSpec console command:
 
-- run all loaded tests: `dribbles` (or shorthand `d`)
-- help: `dribbles --help`
-- name filter: `dribbles --name "migration"`
-- tag filter: `dribbles --tag runtime --tag server`
-- context: `dribbles --context server`
-- fail fast: `dribbles --fail-fast`
+- run all loaded tests: `!dribbles` (or shorthand `!d`)
+- help: `!dribbles --help`
+- name filter: `!dribbles --name "migration"`
+- tag filter: `!dribbles --tag runtime --tag inventory`
+- context: `!dribbles --context server`
+- fail fast: `!dribbles --fail-fast`
 
 If you set `commandAlias` in `RegisterTestGlobals`, use that alias to run only your mod-owned tests:
 
-- run only this mod: `mytests`
+- run only this mod: `!mytests`
 
 ## Skipping tests
 
@@ -110,8 +105,6 @@ If you set `commandAlias` in `RegisterTestGlobals`, use that alias to run only y
 ```lua
 D.test.skip("not ready", function() ... end)
 D.describe.skip("whole suite", function() ... end)
--- or via metadata:
-D.test("skip via opts", { skip = true }, function() ... end)
 ```
 
 ### Dynamic (runtime)
@@ -119,10 +112,9 @@ D.test("skip via opts", { skip = true }, function() ... end)
 Use `D.skip(reason)` (standalone) or `ctx.skip(reason)` (inside test body) to skip based on runtime conditions:
 
 ```lua
-local D = RegisterTestGlobals()
-
 D.describe("Optional integration", { tags = { "entity" } }, function()
     D.test("resolves preplaced entity", function(ctx)
+    		ctx.expect(MY_GUID).toBeUuid()
         local entity = Ext.Entity.Get(MY_GUID)
         if entity == nil then
             D.skip("Entity not in current save")
@@ -137,47 +129,26 @@ end)
 ## Unit test example
 
 ```lua
-local D = RegisterTestGlobals()
 
 D.describe("Settings model", { tags = { "unit" } }, function()
-    D.test("toEqual with volatile preset", function()
+    D.test("toEqual enabled", function()
         local expected = {
             stable = { enabled = true },
-            RuntimeEntityId = 100,
         }
         local actual = {
             stable = { enabled = true },
-            RuntimeEntityId = 999,
         }
 
-        D.expect(actual).toEqual(expected, { volatilePreset = "entity" })
-    end)
-end)
-```
-
-## Runtime test example
-
-```lua
-local D = RegisterTestGlobals()
-
-D.describe("Runtime tick behavior", { tags = { "runtime", "client" } }, function()
-    D.test("nextTick waits exactly one boundary", function(ctx)
-        ctx.requireClient()
-        local before = 0
-        ctx.nextTick()
-        local after = 1
-        ctx.expect(after).toBe(before + 1)
+        D.expect(actual).toEqual(expected)
     end)
 end)
 ```
 
 ## Entity test example (server)
 
-`DisplayName` assertions should run in server context.
+Example: `entity.DisplayName` assertions should run in server context.
 
 ```lua
-local D = RegisterTestGlobals()
-
 D.describe("Entity checks", { tags = { "entity", "server" } }, function()
     D.test("preplaced entity has DisplayName", function(ctx)
         ctx.requireServer()
@@ -201,8 +172,6 @@ end)
 ## Doubles example
 
 ```lua
-local D = RegisterTestGlobals()
-
 D.describe("Doubles", { tags = { "unit" } }, function()
     D.test("spy and assertions", function(ctx)
         local target = {
@@ -221,11 +190,28 @@ D.describe("Doubles", { tags = { "unit" } }, function()
 end)
 ```
 
+```lua
+D.describe("Inventory service", { tags = { "unit" } }, function()
+    D.test("stub replaces an existing method for this test", function(ctx)
+        local inventory = {
+            Count = function(itemId)
+                return 1
+            end,
+        }
+        local stub = ctx.stub(inventory, "Count", function(itemId)
+            return 99
+        end)
+        local count = inventory.Count("potion")
+        ctx.expect(count).toBe(99)
+        ctx.expect(stub).toHaveBeenCalledTimes(1)
+        ctx.expect(stub).toHaveBeenCalledWith("potion")
+    end)
+end)
+```
+
 ## Fixture example
 
 ```lua
-local D = RegisterTestGlobals()
-
 D.describe("Fixture usage", { tags = { "runtime", "entity" } }, function()
     D.test("spawn fallback fixture and restore state", function(ctx)
         local snapshot = ctx.fixture.state.snapshot({
@@ -245,7 +231,6 @@ end)
 Use runner options to plug custom fixture behavior:
 
 ```lua
-local D = RegisterTestGlobals()
 local run = D.RunMine({
     fixtureProviders = {
         {
@@ -264,17 +249,11 @@ local run = D.RunMine({
 })
 ```
 
-Other extension points:
+Other extension points coming in the future.
 
-- `fixtureAliases` for alias-to-spec lookup
-- `fixtureSpawner` for custom spawn behavior
-- `--tag destructive` for explicitly opt-in world mutation suites
+***DribbleSpec is in beta and still evolving. While it is used in practice and even to actively test itself, some advanced features may be unreliable, and breaking API changes are still possible.***
 
-## Troubleshooting
 
-- `RegisterTestGlobals` missing
-  - Ensure DribbleSpec bootstrap loaded before consumer test scripts.
-- entity component mismatch on client
-  - move component assertions (especially `DisplayName`) to server context.
-- no tests executed
-  - verify your test init file is loaded before running `dribbles`.
+<!-- - `fixtureAliases` for alias-to-spec lookup -->
+<!-- - `fixtureSpawner` for custom spawn behavior -->
+<!-- - `--tag destructive` for explicitly opt-in world mutation suites -->
