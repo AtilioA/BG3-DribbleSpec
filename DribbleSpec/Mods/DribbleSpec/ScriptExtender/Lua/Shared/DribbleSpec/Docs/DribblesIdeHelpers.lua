@@ -1,7 +1,7 @@
 --- @meta
 --- @diagnostic disable
 
---- Aggregated EmmyLua annotations for the DribbleSpec testing framework public API (0.1.0+).
+--- Aggregated EmmyLua annotations for the DribbleSpec testing framework public API (1.0.0+).
 --- Consumers should include this file in their code-workspace to enable IDE autocomplete and type hints.
 
 ---@class DribbleSpecTestOptions
@@ -28,11 +28,12 @@
 ---@field toHaveBeenCalledTimes fun(count: integer)
 ---@field toHaveBeenCalledWith fun(...)
 ---@field toBeUuid fun()
+---@field toContain fun()
 ---@field toBeEntity fun()
 ---@field toHaveComponent fun(componentName: string)
 
 ---@class DribbleSpecExpectation : DribbleSpecExpectationModifier
----@field Not DribbleSpecExpectationModifier Negates the expectation (dot syntax friendly; `not` is a reserved keyword)
+---@field Not DribbleSpecExpectationModifier Negates the expectation
 
 ---@class DribbleSpecFixtureStateApi
 ---@field snapshot fun(options: table): DribbleSpecFixtureSnapshot
