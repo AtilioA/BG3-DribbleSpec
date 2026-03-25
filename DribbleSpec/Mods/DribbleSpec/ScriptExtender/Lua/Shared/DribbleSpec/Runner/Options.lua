@@ -1,5 +1,22 @@
 local Options = {}
 
+---@param value string
+---@return string
+local function stripQuotes(value)
+    if type(value) ~= "string" then
+        return ""
+    end
+    local len = #value
+    if len >= 2 then
+        local first = string.sub(value, 1, 1)
+        local last = string.sub(value, len, len)
+        if (first == '"' and last == '"') or (first == "'" and last == "'") then
+            return string.sub(value, 2, len - 1)
+        end
+    end
+    return value
+end
+
 local VALID_CONTEXTS = {
     any = true,
     client = true,
@@ -117,19 +134,19 @@ function Options.ParseArgs(args)
         elseif token == "--verbose" or token == "-v" then
             options.verbose = true
         elseif token == "--name" then
-            options.namePattern = tostring(args[i + 1] or "")
+            options.namePattern = stripQuotes(tostring(args[i + 1] or ""))
             i = i + 1
         elseif token == "--tag" then
-            local tag = tostring(args[i + 1] or "")
+            local tag = stripQuotes(tostring(args[i + 1] or ""))
             if tag ~= "" then
                 table.insert(options.tags, tag)
             end
             i = i + 1
         elseif token == "--context" then
-            options.context = string.lower(tostring(args[i + 1] or "any"))
+            options.context = string.lower(stripQuotes(tostring(args[i + 1] or "any")))
             i = i + 1
         elseif token == "--mod-uuid" then
-            options.ownerModuleUUID = tostring(args[i + 1] or "")
+            options.ownerModuleUUID = stripQuotes(tostring(args[i + 1] or ""))
             i = i + 1
         else
             table.insert(options.unknownArgs, token)
