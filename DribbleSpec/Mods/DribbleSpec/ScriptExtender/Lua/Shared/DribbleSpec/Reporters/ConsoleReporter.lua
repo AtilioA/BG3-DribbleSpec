@@ -203,6 +203,61 @@ local function appendSuiteLines(lines, suite, depth, verbose)
     end
 end
 
+---@param lines string[]
+---@param suite table
+---@param depth integer
+local function appendSuiteLinesQuiet(lines, suite, depth)
+    local indent = string.rep("  ", depth)
+    local passed, failed, skipped = countSuiteStatus(suite)
+    local suiteName = tostring(suite.name or "[unnamed suite]")
+    local metrics = {}
+
+    if passed > 0 then
+        table.insert(metrics, string.format("%s %s", statusIcon("passed"), color(tostring(passed), COLORS.green, true)))
+    end
+
+    if failed > 0 then
+        table.insert(metrics, string.format("%s %s", statusIcon("failed"), color(tostring(failed), COLORS.red, true)))
+    end
+
+    if skipped > 0 then
+        table.insert(metrics,
+            string.format("%s %s", statusIcon("skipped"), color(tostring(skipped), COLORS.yellow, true)))
+    end
+
+    local metricsText = ""
+    if #metrics > 0 then
+        metricsText = "  " .. table.concat(metrics, "  ")
+    end
+
+    table.insert(lines,
+        string.format("%s%s %s%s",
+            indent,
+            color("Suite:", COLORS.cyan, true),
+            color(suiteName, COLORS.white, true),
+            metricsText
+        ))
+
+    for _, test in ipairs(suite.tests or {}) do
+        if test.status ~= "passed" then
+            local icon = statusIcon(test.status)
+            table.insert(lines, string.format("%s  %s %s", indent, icon, tostring(test.name or "[unnamed test]")))
+
+            if test.status == "failed" and test.error and test.error.message then
+                table.insert(lines, string.format("%s    %s %s", indent, color("failure:", COLORS.red, true),
+                    color(tostring(test.error.message), COLORS.red)))
+            elseif test.status == "skipped" and test.skipReason then
+                table.insert(lines, string.format("%s    %s %s", indent, color("skip:", COLORS.yellow, true),
+                    color(tostring(test.skipReason), COLORS.yellow)))
+            end
+        end
+    end
+
+    for _, childSuite in ipairs(suite.suites or {}) do
+        appendSuiteLinesQuiet(lines, childSuite, depth + 1)
+    end
+end
+
 ---@param runResult table
 ---@return string[] lines
 function ConsoleReporter.BuildLines(runResult)
@@ -217,6 +272,7 @@ function ConsoleReporter.BuildLines(runResult)
     local durationMs = tonumber(runResult.durationMs or 0) or 0
     local verbose = runResult.options and runResult.options.verbose == true
 
+    local quiet = runResult.options and runResult.options.quiet == true
     local runStatusText = status == "failed" and color("FAILED", COLORS.red, true) or color("PASSED", COLORS.green, true)
     table.insert(lines,
         string.format("%s %s %s  %s %s  %s %s",
@@ -229,10 +285,18 @@ function ConsoleReporter.BuildLines(runResult)
             color(context, COLORS.white, true)
         ))
 
+    if quiet then
+        table.insert(lines, color("  (quiet mode: passing tests collapsed)", COLORS.gray))
+    end
+
     table.insert(lines, color("", COLORS.gray))
     table.insert(lines, color("RESULTS", COLORS.white, true))
     for _, suite in ipairs(runResult.suites or {}) do
-        appendSuiteLines(lines, suite, 0, verbose)
+        if quiet then
+            appendSuiteLinesQuiet(lines, suite, 0)
+        else
+            appendSuiteLines(lines, suite, 0, verbose)
+        end
     end
 
     table.insert(lines, color("", COLORS.gray))

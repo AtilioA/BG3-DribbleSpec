@@ -6,6 +6,7 @@ local HELP_TOPICS = {
     "context",
     "fail-fast",
     "verbose",
+    "quiet",
     "mod-uuid",
 }
 
@@ -25,6 +26,11 @@ local HELP_TOPIC_ALIASES = {
     ["verbose"] = "verbose",
     ["--verbose"] = "verbose",
     ["-v"] = "verbose",
+    ["quiet"] = "quiet",
+    ["--quiet"] = "quiet",
+    ["-q"] = "quiet",
+    ["no-quiet"] = "no-quiet",
+    ["--no-quiet"] = "no-quiet",
     ["mod-uuid"] = "mod-uuid",
     ["--mod-uuid"] = "mod-uuid",
     ["moduuid"] = "mod-uuid",
@@ -74,6 +80,8 @@ local function printOverview(printLine)
     printLine("  --context <client|server|any>  Filter by context tag semantics (default: any)")
     printLine("  --fail-fast                    Stop run after first failure")
     printLine("  -v, --verbose                  Print assertion and hook details")
+    printLine("  -q, --quiet                    Collapse passing tests; show only failures")
+    printLine("  --no-quiet                     Force full output even with many tests")
     printLine("  --mod-uuid <uuid>              Filter run to the owner module UUID")
     printLine("")
     printLine("Defaults:")
@@ -136,6 +144,25 @@ local function printTopicHelp(printLine, topic)
         printLine("  Syntax: -v | --verbose")
         printLine("  Prints assertion and hook details for each executed test.")
         printLine("  Example: dribbles --verbose")
+        return true
+    end
+
+    if topic == "quiet" then
+        printLine("Topic: quiet")
+        printLine("  Syntax: -q | --quiet")
+        printLine("  Collapses passing tests; only shows suite summaries and failures.")
+        printLine("  Automatically enabled when >100 tests are selected (opt-out with --no-quiet).")
+        printLine("  Useful for LLM context budgets and large test suites.")
+        printLine("  Example: dribbles --quiet")
+        return true
+    end
+
+    if topic == "no-quiet" then
+        printLine("Topic: no-quiet")
+        printLine("  Syntax: --no-quiet")
+        printLine("  Forces full output even when >100 tests would trigger quiet mode.")
+        printLine("  Use when you need to see all passing test names.")
+        printLine("  Example: dribbles --no-quiet")
         return true
     end
 

@@ -23,6 +23,8 @@ local VALID_CONTEXTS = {
     server = true,
 }
 
+local QUIET_THRESHOLD = 100
+
 local HELP_TOPIC_ALIASES = {
     ["help"] = "help",
     ["-h"] = "help",
@@ -42,6 +44,11 @@ local HELP_TOPIC_ALIASES = {
     ["verbose"] = "verbose",
     ["--verbose"] = "verbose",
     ["-v"] = "verbose",
+    ["quiet"] = "quiet",
+    ["--quiet"] = "quiet",
+    ["-q"] = "quiet",
+    ["no-quiet"] = "no-quiet",
+    ["--no-quiet"] = "no-quiet",
 }
 
 ---@param topic string|nil
@@ -93,6 +100,8 @@ function Options.Normalize(options)
 
     normalized.failFast = normalized.failFast == true
     normalized.verbose = normalized.verbose == true
+    normalized.quiet = normalized.quiet == true
+    normalized.noQuiet = normalized.noQuiet == true
     normalized.help = normalized.help == true
     normalized.helpTopic = normalizeHelpTopic(normalized.helpTopic)
     if type(normalized.ownerModuleUUID) ~= "string" or normalized.ownerModuleUUID == "" then
@@ -133,6 +142,10 @@ function Options.ParseArgs(args)
             options.failFast = true
         elseif token == "--verbose" or token == "-v" then
             options.verbose = true
+        elseif token == "--quiet" or token == "-q" then
+            options.quiet = true
+        elseif token == "--no-quiet" then
+            options.noQuiet = true
         elseif token == "--name" then
             options.namePattern = stripQuotes(tostring(args[i + 1] or ""))
             i = i + 1
@@ -156,6 +169,19 @@ function Options.ParseArgs(args)
     end
 
     return Options.Normalize(options)
+end
+
+---@param options table
+---@param testCount integer
+---@return boolean
+function Options.ShouldUseQuietMode(options, testCount)
+    if options.noQuiet == true then
+        return false
+    end
+    if options.quiet == true then
+        return true
+    end
+    return testCount > QUIET_THRESHOLD
 end
 
 return Options

@@ -1,6 +1,7 @@
 local ResultModel = Ext.Require("Shared/DribbleSpec/Core/ResultModel.lua")
 local Sandbox = Ext.Require("Shared/DribbleSpec/Internal/Sandbox.lua")
 local Filter = Ext.Require("Shared/DribbleSpec/Runner/Filter.lua")
+local Options = Ext.Require("Shared/DribbleSpec/Runner/Options.lua")
 local Expect = Ext.Require("Shared/DribbleSpec/Expect/Expect.lua")
 local Doubles = Ext.Require("Shared/DribbleSpec/Doubles/Doubles.lua")
 local RuntimeHelpers = Ext.Require("Shared/DribbleSpec/Runtime/Helpers.lua")
@@ -280,8 +281,6 @@ function Runner.Run(params)
     local nowMs = (clock and clock.NowMs) and clock.NowMs or function() return 0 end
     local filter = Filter.Create(options)
 
-    local run = ResultModel.NewRun(Runner.DetectContext(), options, nowMs())
-
     local snapshot = { suites = {} }
     if registry and type(registry.Snapshot) == "function" then
         snapshot = registry:Snapshot()
@@ -289,6 +288,41 @@ function Runner.Run(params)
 
     local hasOnly = snapshot.hasOnly == true
     local stopRequested = false
+
+    ---@param suite table
+    ---@param lineage table[]
+    ---@return integer
+    local function countSelectedTests(suite, lineage)
+        local currentLineage = {}
+        for i = 1, #lineage do
+            currentLineage[i] = lineage[i]
+        end
+        table.insert(currentLineage, suite)
+
+        local count = 0
+        for _, test in ipairs(suite.tests or {}) do
+            if filter.ShouldIncludeTest(currentLineage, test) then
+                count = count + 1
+            end
+        end
+
+        for _, childSuite in ipairs(suite.suites or {}) do
+            count = count + countSelectedTests(childSuite, currentLineage)
+        end
+
+        return count
+    end
+
+    local totalTestCount = 0
+    for _, suite in ipairs(snapshot.suites or {}) do
+        totalTestCount = totalTestCount + countSelectedTests(suite, {})
+    end
+
+    if Options.ShouldUseQuietMode(options, totalTestCount) then
+        options.quiet = true
+    end
+
+    local run = ResultModel.NewRun(Runner.DetectContext(), options, nowMs())
 
     ---@param suite table
     ---@param lineage table[]
