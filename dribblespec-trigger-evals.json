@@ -1,0 +1,22 @@
+[
+  {"query": "I need to write tests for my BG3 mod using DribbleSpec", "should_trigger": true},
+  {"query": "How do I use describe and test in DribbleSpec?", "should_trigger": true},
+  {"query": "Debug failing tests in BG3 Script Extender", "should_trigger": true},
+  {"query": "Create test suite for BG3SE mod with RegisterTestGlobals", "should_trigger": true},
+  {"query": "Running dribbles tests in console", "should_trigger": true},
+  {"query": "My entity tests are failing in DribbleSpec", "should_trigger": true},
+  {"query": "Set up test framework for Baldur's Gate 3 mod", "should_trigger": true},
+  {"query": "Use expect matchers in BG3 testing", "should_trigger": true},
+  {"query": "How to tag tests in DribbleSpec?", "should_trigger": true},
+  {"query": "Filter tests by name in dribbles command", "should_trigger": true},
+  {"query": "Debug runtime errors in BG3SE", "should_trigger": false},
+  {"query": "How to install mods in Baldur's Gate 3", "should_trigger": false},
+  {"query": "Create new spell for BG3", "should_trigger": false},
+  {"query": "Edit game files in BG3", "should_trigger": false},
+  {"query": "Write Lua for BG3 without testing", "should_trigger": false},
+  {"query": "General Lua programming help", "should_trigger": false},
+  {"query": "How to use Script Extender console", "should_trigger": false},
+  {"query": "BG3 modding tutorial", "should_trigger": false},
+  {"query": "Add items to BG3", "should_trigger": false},
+  {"query": "Fix BG3 crashes", "should_trigger": false}
+]
