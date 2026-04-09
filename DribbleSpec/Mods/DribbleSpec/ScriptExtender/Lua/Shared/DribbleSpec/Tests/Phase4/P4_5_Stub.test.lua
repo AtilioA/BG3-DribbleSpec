@@ -45,4 +45,33 @@ DribbleSpec.describe("DribbleSpec Phase4 P4.5 stub", { tags = { "unit", "phase4"
         Assertions.Equals(type(err), "string", "missing function should throw")
         Assertions.Contains(err, "existing function", "error message")
     end)
+
+    DribbleSpec.test("ctx.stub auto-wraps _G.Osi and _G.Ext", function(ctx)
+        -- Setup fake Osi/Ext globals for the context of this test
+        local originalOsi = { 
+            ApplyStatus = function() return "real status" end
+        }
+        _G.Osi = originalOsi
+
+        ctx.TrackRestore(function()
+            _G.Osi = nil
+        end)
+
+        local stub = ctx.stub(_G.Osi, "ApplyStatus", function()
+            return "mock status"
+        end)
+
+        -- The wrapper mechanism replaces _G.Osi with a new object that inherits from original
+        Assertions.NotEquals(_G.Osi, originalOsi, "_G.Osi should be replaced with a wrapper")
+        Assertions.Equals(type(_G.Osi.ApplyStatus), "function", "ApplyStatus is present on wrapper")
+        
+        -- Calls through _G.Osi now hit the mock
+        local result = _G.Osi.ApplyStatus()
+        Assertions.Equals(result, "mock status", "mock implementation took effect")
+        ctx.expect(stub).toHaveBeenCalledTimes(1)
+
+        -- And the wrapper resolves fallback properly
+        originalOsi.Untouched = function() return "real untouched" end
+        Assertions.Equals(_G.Osi.Untouched(), "real untouched", "wrapper metatable inheritance")
+    end)
 end)

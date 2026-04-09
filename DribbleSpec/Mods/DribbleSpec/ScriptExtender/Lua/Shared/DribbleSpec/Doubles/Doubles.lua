@@ -4,6 +4,30 @@ local stateByFn = setmetatable({}, {
     __mode = "k",
 })
 
+---@param sandbox table
+---@param target any
+---@return any
+local function wrapIfNeeded(sandbox, target)
+    if (target == _G.Osi or target == _G.Ext) and target ~= nil then
+        if type(sandbox) ~= "table" or type(sandbox.TrackRestore) ~= "function" then
+            error("Cannot wrap Ext/Osi without a valid sandbox context", 3)
+        end
+        local name = (target == _G.Osi) and "Osi" or "Ext"
+        sandbox._wrappers = sandbox._wrappers or {}
+        if not sandbox._wrappers[name] then
+            local original = target
+            local wrapper = setmetatable({}, { __index = original })
+            sandbox._wrappers[name] = wrapper
+            _G[name] = wrapper
+            sandbox:TrackRestore(function()
+                _G[name] = original
+            end)
+        end
+        return sandbox._wrappers[name]
+    end
+    return target
+end
+
 ---@param fn function
 ---@return table|nil
 function Doubles.GetState(fn)
@@ -51,16 +75,18 @@ end
 ---@param methodName string
 ---@return function
 function Doubles.CreateSpyOn(sandbox, target, methodName)
-    if type(target) ~= "table" then
-        error("ctx.spyOn(target, methodName) expects target to be a table", 2)
+    if type(target) ~= "table" and type(target) ~= "userdata" then
+        error("ctx.spyOn(target, methodName) expects target to be a table or userdata", 2)
     end
+
+    target = wrapIfNeeded(sandbox, target)
 
     if type(methodName) ~= "string" or methodName == "" then
         error("ctx.spyOn(target, methodName) expects a non-empty methodName", 2)
     end
 
     local original = target[methodName]
-    if type(original) ~= "function" then
+    if type(original) ~= "function" and type(original) ~= "userdata" then
         error("ctx.spyOn(target, methodName) requires an existing function", 2)
     end
 
@@ -84,9 +110,11 @@ end
 ---@param impl function
 ---@return function
 function Doubles.CreateStub(sandbox, target, methodName, impl)
-    if type(target) ~= "table" then
-        error("ctx.stub(target, methodName, impl) expects target to be a table", 2)
+    if type(target) ~= "table" and type(target) ~= "userdata" then
+        error("ctx.stub(target, methodName, impl) expects target to be a table or userdata", 2)
     end
+
+    target = wrapIfNeeded(sandbox, target)
 
     if type(methodName) ~= "string" or methodName == "" then
         error("ctx.stub(target, methodName, impl) expects a non-empty methodName", 2)
@@ -97,7 +125,7 @@ function Doubles.CreateStub(sandbox, target, methodName, impl)
     end
 
     local original = target[methodName]
-    if type(original) ~= "function" then
+    if type(original) ~= "function" and type(original) ~= "userdata" then
         error("ctx.stub(target, methodName, impl) requires an existing function", 2)
     end
 
