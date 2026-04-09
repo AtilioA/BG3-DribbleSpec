@@ -16,7 +16,21 @@ local function wrapIfNeeded(sandbox, target)
         sandbox._wrappers = sandbox._wrappers or {}
         if not sandbox._wrappers[name] then
             local original = target
-            local wrapper = setmetatable({}, { __index = original })
+            local wrapper = setmetatable({}, {
+                __index = function(_, key)
+                    local val = original[key]
+                    if type(val) == "function" or type(val) == "userdata" then
+                        -- Bind it to the wrapper so that when called, it doesn't get messed up?
+                        -- Actually, the original is just Osi, so methods on original don't need re-binding.
+                        return val
+                    end
+                    return val
+                end,
+                __newindex = function(_, key, value)
+                    -- Don't allow writing directly to Osi inside the catch-all, but we just pass it
+                    original[key] = value
+                end
+            })
             sandbox._wrappers[name] = wrapper
             _G[name] = wrapper
             sandbox:TrackRestore(function()
