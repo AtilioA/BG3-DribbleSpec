@@ -20,8 +20,6 @@ local function wrapIfNeeded(sandbox, target)
                 __index = function(_, key)
                     local val = original[key]
                     if type(val) == "function" or type(val) == "userdata" then
-                        -- Bind it to the wrapper so that when called, it doesn't get messed up?
-                        -- Actually, the original is just Osi, so methods on original don't need re-binding.
                         return val
                     end
                     return val
