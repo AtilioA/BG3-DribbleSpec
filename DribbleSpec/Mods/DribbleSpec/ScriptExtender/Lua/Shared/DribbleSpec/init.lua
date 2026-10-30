@@ -41,10 +41,46 @@ local runService = RunService.Create({
     resultModel = ResultModel,
 })
 
+---@type table<string, fun(options: table): (fun())|nil>
+local consumerRunHooks = {}
+
+---@param options table
+---@return table
+local function runConsumerTests(options)
+    options = Options.Normalize(options or {})
+    local beforeRun = consumerRunHooks[options.ownerModuleUUID]
+    if beforeRun == nil then
+        return runService.Run(options)
+    end
+
+    local cleanup
+    local ok, result = xpcall(function()
+        cleanup = beforeRun(options)
+        if cleanup ~= nil and type(cleanup) ~= "function" then
+            error("RegisterTestGlobals beforeRun must return a cleanup function or nil")
+        end
+        return runService.Run(options)
+    end, debug.traceback)
+
+    local cleanupOk, cleanupError = true, nil
+    if cleanup ~= nil then
+        cleanupOk, cleanupError = xpcall(cleanup, debug.traceback)
+    end
+
+    if not ok then
+        error(result, 0)
+    end
+    if not cleanupOk then
+        error(cleanupError, 0)
+    end
+
+    return result
+end
+
 local serverRunChannel = ServerRunChannel.Create({
     moduleUUID = ModuleUUID,
     options = Options,
-    runLocal = runService.Run,
+    runLocal = runConsumerTests,
     printWarning = ConsoleIO.PrintWarning,
     isServer = function()
         return Ext.IsServer() == true
@@ -69,7 +105,7 @@ local function executeRun(options)
             return Ext.IsClient() == true
         end,
         requestServerRun = serverRunChannel.RequestServerRun,
-        runLocal = runService.Run,
+        runLocal = runConsumerTests,
         renderRun = function(run)
             ConsoleReporter.PrintRun(run, {
                 printLine = ConsoleIO.PrintLine,
@@ -199,6 +235,7 @@ local function normalizeRegisterOptions(options)
         globalTags = {},
         ownerModuleUUID = nil,
         commandAlias = nil,
+        beforeRun = nil,
     }
 
     local explicitOwnerModuleUUID = options.ownerModuleUUID
@@ -224,6 +261,13 @@ local function normalizeRegisterOptions(options)
             end
             table.insert(normalized.globalTags, tag)
         end
+    end
+
+    if options.beforeRun ~= nil then
+        if type(options.beforeRun) ~= "function" then
+            error("RegisterTestGlobals(options) beforeRun must be a function", 3)
+        end
+        normalized.beforeRun = options.beforeRun
     end
 
     if options.commandAlias ~= nil then
@@ -273,7 +317,7 @@ end
 
 ApiBinder.Bind(DribbleSpec, registry)
 
-DribbleSpec.Run = runService.Run
+DribbleSpec.Run = runConsumerTests
 DribbleSpec.RunFromArgs = runFromArgs
 DribbleSpec.expect = Expect.Expect
 DribbleSpec.entityRef = EntityRef.Create
@@ -305,6 +349,12 @@ local function registerTestGlobals(options)
     })
     exported.it = exported.test
 
+    if registerOptions.ownerModuleUUID ~= nil and
+        registerOptions.beforeRun ~= nil and
+        consumerRunHooks[registerOptions.ownerModuleUUID] == nil then
+        consumerRunHooks[registerOptions.ownerModuleUUID] = registerOptions.beforeRun
+    end
+
     exported.RunMine = function(runOptions)
         if runOptions ~= nil and type(runOptions) ~= "table" then
             error("RunMine(options) expects a table when options are provided", 2)
@@ -318,7 +368,7 @@ local function registerTestGlobals(options)
         end
         optionsWithOwner.ownerModuleUUID = registerOptions.ownerModuleUUID
 
-        return runService.Run(optionsWithOwner)
+        return runConsumerTests(optionsWithOwner)
     end
 
     if registerOptions.commandAlias ~= nil then

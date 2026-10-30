@@ -90,6 +90,7 @@
 ---@field ownerModuleUUID? string Defaults to current `ModuleUUID` when available; set explicitly when using `commandAlias`
 ---@field globalTags? string[] Appended to every `describe/test` metadata tags array
 ---@field commandAlias? string Optional extra console command that runs this mod's tests only; requires explicit `ownerModuleUUID`
+---@field beforeRun? fun(options: table): (fun())|nil Called before a consumer run; the returned cleanup function is always called afterward
 
 ---@param options? DribbleSpecRegisterOptions
 ---@return DribbleSpecGlobals

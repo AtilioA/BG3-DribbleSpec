@@ -90,4 +90,27 @@ DribbleSpec.describe("DribbleSpec Phase8 P8.2 RegisterTestGlobals", { tags = { "
             Assertions.Equals(type(exports.RunMine), "function", "RunMine export")
             Assertions.Equals(run.options.ownerModuleUUID, "mod-owner-2", "run owner option")
         end)
+
+        DribbleSpec.test("RegisterTestGlobals runs beforeRun cleanup around RunMine", function()
+            local phases = {}
+            local receivedOptions = nil
+            local exports = RegisterTestGlobals({
+                ownerModuleUUID = "mod-owner-before-run",
+                beforeRun = function(options)
+                    receivedOptions = options
+                    table.insert(phases, "before")
+                    return function()
+                        table.insert(phases, "after")
+                    end
+                end,
+            })
+
+            local run = exports.RunMine({ verbose = true })
+
+            Assertions.Equals(run.status, "passed", "run status")
+            Assertions.Equals(receivedOptions.ownerModuleUUID, "mod-owner-before-run", "hook owner")
+            Assertions.Equals(receivedOptions.verbose, true, "hook run options")
+            Assertions.Equals(phases[1], "before", "beforeRun phase")
+            Assertions.Equals(phases[2], "after", "cleanup phase")
+        end)
     end)
