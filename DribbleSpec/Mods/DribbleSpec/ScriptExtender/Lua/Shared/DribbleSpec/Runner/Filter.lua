@@ -122,12 +122,25 @@ function Filter.Create(options)
         ownerModuleUUID = normalized.ownerModuleUUID
     end
 
+    ---@type table<string, boolean>|nil
+    local testIdSet = nil
+    if type(normalized.testIds) == "table" then
+        testIdSet = {}
+        for _, id in ipairs(normalized.testIds) do
+            testIdSet[id] = true
+        end
+    end
+
     local filter = {}
 
     ---@param lineage table[]|nil
     ---@param test table
     ---@return boolean
     function filter.ShouldIncludeTest(lineage, test)
+        if testIdSet ~= nil and testIdSet[test and test.fullName or ""] ~= true then
+            return false
+        end
+
         if not matchesNamePattern(namePattern, test and test.fullName or "") then
             return false
         end

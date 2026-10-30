@@ -83,8 +83,11 @@
 ---@field expect fun(actual: any): DribbleSpecExpectation Creates an expectation for the given value
 ---@field entityRef fun(source: any): table Retrieves a stable entity reference
 ---@field skip fun(reason?: string) Throws a SkipSignal to bypass execution
----@field RunMine fun(options?: table): table Runs tests filtered to the registered owner module
+---@field RunMine fun(options?: DribbleSpecRunOptions): table Runs tests filtered to the registered owner module
 ---@field RegisterTestGlobals fun(options?: DribbleSpecRegisterOptions): DribbleSpecGlobals Returns the DribbleSpec API symbols
+
+---@class DribbleSpecRunOptions: table
+---@field testIds? string[] Internal: runs only tests whose full name matches exactly (ANDed with other filters); `{}` selects none; ignores `.only` focus
 
 ---@class DribbleSpecRegisterOptions
 ---@field ownerModuleUUID? string Defaults to current `ModuleUUID` when available; set explicitly when using `commandAlias`

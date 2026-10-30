@@ -109,6 +109,26 @@ function Options.Normalize(options)
     end
     normalized.unknownArgs = normalized.unknownArgs or {}
 
+    local testIds = normalized.testIds
+    if testIds ~= nil then
+        local valid = type(testIds) == "table"
+        if valid then
+            local count = 0
+            for _ in pairs(testIds) do
+                count = count + 1
+            end
+            for i = 1, count do
+                if type(testIds[i]) ~= "string" then
+                    valid = false
+                    break
+                end
+            end
+        end
+        if not valid then
+            error("DribbleSpec: options.testIds must be an array of test full names")
+        end
+    end
+
     return normalized
 end
 

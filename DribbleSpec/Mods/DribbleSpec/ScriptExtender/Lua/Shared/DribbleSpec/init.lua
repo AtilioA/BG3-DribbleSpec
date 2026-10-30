@@ -44,7 +44,7 @@ local runService = RunService.Create({
 ---@type table<string, fun(options: table): (fun())|nil>
 local consumerRunHooks = {}
 
----@param options table
+---@param options DribbleSpecRunOptions
 ---@return table
 local function runConsumerTests(options)
     options = Options.Normalize(options or {})

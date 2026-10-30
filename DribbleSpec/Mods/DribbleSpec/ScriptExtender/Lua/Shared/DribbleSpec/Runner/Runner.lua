@@ -286,7 +286,7 @@ function Runner.Run(params)
         snapshot = registry:Snapshot()
     end
 
-    local hasOnly = snapshot.hasOnly == true
+    local hasOnly = snapshot.hasOnly == true and type(options.testIds) ~= "table"
     local stopRequested = false
 
     ---@param suite table
