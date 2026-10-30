@@ -49,3 +49,10 @@ AGENTS.md
 DribbleSpec.code-workspace
 symlink.bat
 scripts/symlink-dribblespec-skill.ps1
+
+# Mutation testing host
+.dribblespec-mutation/
+.venv/
+__pycache__/
+.pytest_cache/
+*.egg-info/
