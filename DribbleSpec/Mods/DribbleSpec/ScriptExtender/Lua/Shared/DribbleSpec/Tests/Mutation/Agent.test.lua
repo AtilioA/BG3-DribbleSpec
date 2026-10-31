@@ -6,22 +6,32 @@ local Runner = Ext.Require("Shared/DribbleSpec/Runner/Runner.lua")
 local Options = Ext.Require("Shared/DribbleSpec/Runner/Options.lua")
 local SkipSignal = Ext.Require("Shared/DribbleSpec/Runtime/SkipSignal.lua")
 Ext.Require("Shared/DribbleSpec/Tests/Mutation/Fixture.lua")
+Ext.Require("Shared/DribbleSpec/Tests/Mutation/LoopFixture.lua")
 
 local RUN_ID = "selftest-agent"
 local DIR = "DribbleSpecMutation/" .. RUN_ID .. "/"
 local PATCH = DIR .. "1.lua"
+local LOOP_PATCH = DIR .. "2.lua"
 local FIXTURE_DIR = "Mods/DribbleSpec/ScriptExtender/Lua/Shared/DribbleSpec/Tests/Mutation/"
 -- Pinned hash of Fixture.lua; tools/mutation/tests/test_fixture.py checks it and Fixture.patch.txt.
 local FIXTURE_HASH = "74478c78"
+local LOOP_FIXTURE_HASH = "ed9cbd2f"
 local ABOVE = "Fixture IsAtLeast is true above the minimum"
 local OTHER = "Fixture other does not call the target"
 local SKIPS = "Fixture skips skips when IsAtLeast is wrong"
 local HOOK_TEST = "Fixture hook runs after beforeAll"
 local HOOK = "Fixture hook [hook] beforeAll"
+local LOOP = "Fixture loop approaches the target"
+local SWALLOW = "Fixture loop swallows errors from the target"
+local FAR = "Fixture loop approaches a far target"
+local SKIPPED = "Fixture other is skipped"
+-- Mutant ids in LoopFixture.patch.txt: 6 is `<` to `<=` (ends), 7 is `<` to `>=` (never ends).
+local LOOP_ENDS, LOOP_FOREVER = 6, 7
 
 ---@param sourceHash string
 local function writePlan(sourceHash)
     Ext.IO.SaveFile(PATCH, Ext.IO.LoadFile(FIXTURE_DIR .. "Fixture.patch.txt", "data"))
+    Ext.IO.SaveFile(LOOP_PATCH, Ext.IO.LoadFile(FIXTURE_DIR .. "LoopFixture.patch.txt", "data"))
     Ext.IO.SaveFile(DIR .. "coverage.jsonl", "")
     Ext.IO.SaveFile(DIR .. "results.jsonl", "")
     Ext.IO.SaveFile(DIR .. "plan.json", Ext.Json.Stringify({
@@ -37,13 +47,20 @@ local function writePlan(sourceHash)
             sourceHash = sourceHash,
             patchPath = PATCH,
             targets = { "MutationFixture.IsAtLeast" },
+        }, {
+            index = 2,
+            path = "Shared/DribbleSpec/Tests/Mutation/LoopFixture.lua",
+            sourceHash = LOOP_FIXTURE_HASH,
+            patchPath = LOOP_PATCH,
+            targets = { "MutationLoopFixture.Approach" },
         } },
         mutants = {},
     }))
 end
 
+---@param clock (fun(): number)|nil
 ---@return MutationAgent
-local function createAgent()
+local function createAgent(clock)
     local registry = Registry.Create()
     registry:BeginSuite("Fixture")
     registry:BeginSuite("IsAtLeast")
@@ -53,6 +70,7 @@ local function createAgent()
     registry:EndSuite()
     registry:BeginSuite("other")
     registry:AddTest("does not call the target", {}, function() end)
+    registry:AddTest("is skipped", {}, function() SkipSignal.Throw("always") end)
     registry:EndSuite()
     registry:BeginSuite("skips")
     registry:AddTest("skips when IsAtLeast is wrong", {}, function()
@@ -67,9 +85,21 @@ local function createAgent()
     end)
     registry:AddTest("runs after beforeAll", {}, function() end)
     registry:EndSuite()
+    registry:BeginSuite("loop")
+    registry:AddTest("approaches the target", {}, function()
+        Assertions.Equals(MutationLoopFixture.Approach(0, 5), 5, "Approach(0, 5)")
+    end)
+    registry:AddTest("swallows errors from the target", {}, function()
+        pcall(MutationLoopFixture.Approach, 0, 5)
+    end)
+    registry:AddTest("approaches a far target", {}, function()
+        Assertions.Equals(MutationLoopFixture.Approach(0, 2000), 2000, "Approach(0, 2000)")
+    end)
+    registry:EndSuite()
     registry:EndSuite()
     return Agent.Create({
         registry = registry,
+        clock = clock,
         run = function(options)
             return Runner.Run({ registry = registry, options = Options.Normalize(options), clock = { NowMs = function() return 0 end } })
         end,
@@ -103,7 +133,7 @@ DribbleSpec.describe("DribbleSpec Mutation agent", { tags = { "mutation" } }, fu
         Assertions.Equals(agent.Prepare(RUN_ID), "ok", "Prepare")
         Assertions.Equals(MutationFixture.IsAtLeast ~= original, true, "patched")
         Assertions.Equals(Ext.IO.LoadFile(DIR .. "tests.json"),
-            Ext.Json.Stringify({ ABOVE, OTHER, SKIPS, HOOK_TEST }, { Beautify = false }), "tests.json")
+            Ext.Json.Stringify({ ABOVE, OTHER, SKIPPED, SKIPS, HOOK_TEST, LOOP, SWALLOW, FAR }, { Beautify = false }), "tests.json")
     end)
 
     DribbleSpec.test("DryRun records hits only for the test that calls the target", function()
@@ -114,6 +144,17 @@ DribbleSpec.describe("DribbleSpec Mutation agent", { tags = { "mutation" } }, fu
         Assertions.Equals(#lines, 2, "coverage lines")
         Assertions.Equals(table.concat(lines[1].hits, ","), "1,2", "hits of " .. ABOVE)
         Assertions.Equals(#lines[2].hits, 0, "hits of " .. OTHER)
+    end)
+
+    DribbleSpec.test("DryRun writes a coverage line with no hits for a skipped test", function()
+        writePlan(FIXTURE_HASH)
+        agent.Prepare(RUN_ID)
+        Assertions.Equals(agent.DryRun(RUN_ID, { SKIPPED }), "ok", "DryRun")
+        local lines = readLines("coverage.jsonl")
+        Assertions.Equals(#lines, 1, "coverage lines")
+        Assertions.Equals(lines[1].test, SKIPPED, "test")
+        Assertions.Equals(lines[1].status, "skipped", "status")
+        Assertions.Equals(#lines[1].hits, 0, "hits")
     end)
 
     DribbleSpec.test("DryRun raises for a selected test that did not run", function()
@@ -178,6 +219,62 @@ DribbleSpec.describe("DribbleSpec Mutation agent", { tags = { "mutation" } }, fu
         Assertions.Equals(lines[1].status, "Survived", "hook passes under >= to >")
         Assertions.Equals(lines[2].status, "Killed", "hook fails under >= to <")
         Assertions.Equals(lines[2].killedBy[1], HOOK, "killedBy")
+    end)
+
+    DribbleSpec.test("RunMutant classifies an infinite loop as Timeout", function()
+        writePlan(FIXTURE_HASH)
+        agent.Prepare(RUN_ID)
+        agent.DryRun(RUN_ID, { LOOP })
+        Assertions.Equals(agent.RunMutant(RUN_ID, LOOP_FOREVER, { LOOP }), "ok", "RunMutant")
+        local line = readLines("results.jsonl")[1]
+        Assertions.Equals(line.status, "Timeout", "status")
+        Assertions.Equals(line.message, "step limit", "message")
+    end)
+
+    DribbleSpec.test("RunMutant classifies a limit error swallowed by pcall as Timeout", function()
+        writePlan(FIXTURE_HASH)
+        agent.Prepare(RUN_ID)
+        agent.RunMutant(RUN_ID, LOOP_FOREVER, { SWALLOW })
+        Assertions.Equals(readLines("results.jsonl")[1].status, "Timeout", "status")
+    end)
+
+    DribbleSpec.test("RunMutant classifies wall-clock expiry as Timeout", function()
+        local now = 0
+        agent = createAgent(function()
+            now = now + 30000
+            return now
+        end)
+        writePlan(FIXTURE_HASH)
+        agent.Prepare(RUN_ID)
+        -- About 2,000 dry-run steps give a 20,000-step limit, so the 1,000-step clock check fires first.
+        agent.DryRun(RUN_ID, { FAR })
+        agent.RunMutant(RUN_ID, LOOP_FOREVER, { FAR })
+        local line = readLines("results.jsonl")[1]
+        Assertions.Equals(line.status, "Timeout", "status")
+        Assertions.Equals(line.message, "time limit", "message")
+    end)
+
+    DribbleSpec.test("after a Timeout the next mutant starts with a cleared step count and flag", function()
+        writePlan(FIXTURE_HASH)
+        agent.Prepare(RUN_ID)
+        agent.RunMutant(RUN_ID, LOOP_FOREVER, { LOOP })
+        Assertions.Equals(agent.Runtime.steps, 0, "steps")
+        Assertions.Equals(agent.Runtime.limitHit, nil, "limitHit")
+        -- Leftovers from gameplay steps or a stale flag must not reach the next mutant.
+        agent.Runtime.steps, agent.Runtime.limitHit = 1e6, "steps"
+        agent.RunMutant(RUN_ID, LOOP_ENDS, { LOOP })
+        Assertions.Equals(readLines("results.jsonl")[2].status, "Survived", "next mutant")
+    end)
+
+    DribbleSpec.test("no limit error is raised with no active mutant past the step limit", function()
+        writePlan(FIXTURE_HASH)
+        agent.Prepare(RUN_ID)
+        agent.RunMutant(RUN_ID, LOOP_FOREVER, { LOOP })
+        local stepLimit = agent.Runtime.stepLimit
+        agent.Runtime.stepLimit = 1
+        local ok, value = pcall(MutationLoopFixture.Approach, 0, 5)
+        agent.Runtime.stepLimit = stepLimit
+        Assertions.Equals(ok and value, 5, "Approach(0, 5) with no active mutant")
     end)
 
     DribbleSpec.test("Restore reinstalls the original function", function()

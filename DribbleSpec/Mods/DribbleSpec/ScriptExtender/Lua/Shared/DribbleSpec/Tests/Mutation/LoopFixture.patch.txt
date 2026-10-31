@@ -1,0 +1,13 @@
+local __M = Mods.Dribbles.Mutation.Runtime; -- Loop target for the mutation agent timeout self-tests: mutant `<` to `>=` never ends. Agent.test.lua pins this file's hash.
+                        
+
+function MutationLoopFixture.Approach(value, target) __M.S();
+    while __M.Cmp(3, "~=", (value), (target)) do __M.S();
+        if (__M.On(4) or not __M.On(5) and (__M.Cmp(6, "<", (value), (target)))) then
+            value = __M.Arith(8, "+", (value), (1))
+        else
+            value = __M.Arith(9, "-", (value), (1))
+        end
+    end
+    return value
+end

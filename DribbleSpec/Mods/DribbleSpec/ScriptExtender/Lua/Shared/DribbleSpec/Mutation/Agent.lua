@@ -6,10 +6,16 @@ local Filter = Ext.Require("Shared/DribbleSpec/Runner/Filter.lua")
 ---@class MutationAgentDeps
 ---@field registry DribbleSpecRegistry tests to resolve the plan's testFilter against
 ---@field run fun(options: table): table runs tests and returns a DribbleSpec run result
+---@field clock (fun(): number)|nil milliseconds; defaults to Ext.Timer.MonotonicTime
 
 ---@class MutationAgent
 ---@field Runtime MutationRuntime
 local Agent = {}
+
+local MIN_STEP_LIMIT = 1000
+local STEP_LIMIT_FACTOR = 10
+local WALL_CLOCK_MS = 20000
+local LIMIT_MESSAGES = { steps = "step limit", time = "time limit" }
 
 ---@param data string
 ---@return string
@@ -134,6 +140,9 @@ function Agent.Create(deps)
     local originals = nil
     ---@type table|nil
     local plan = nil
+    local clock = deps.clock or Ext.Timer.MonotonicTime
+    ---@type table<string, integer> steps per passed test in this agent's dry runs
+    local dryRunSteps = {}
 
     local function runOptions(testIds)
         return { ownerModuleUUID = plan.ownerModuleUUID, testIds = testIds }
@@ -208,12 +217,11 @@ function Agent.Create(deps)
             if plan == nil then
                 error("no prepared run; call Prepare first", 0)
             end
-            local kept = 0
             local ok, err = xpcall(function()
                 Runtime.a = 0
                 for _, id in ipairs(testIds) do
                     Runtime.hits, Runtime.steps = {}, 0
-                    local started = Ext.Timer.MonotonicTime()
+                    local started = clock()
                     local run = deps.run(runOptions({ id }))
                     local result
                     eachResult(run.suites, function(test)
@@ -226,29 +234,27 @@ function Agent.Create(deps)
                     if status == "failed" or (run.summary.failed or 0) > 0 then
                         error("test failed in dry run: " .. id, 0)
                     end
+                    -- Skipped tests also get a line, so the host can see every id of a batch finish.
+                    local hits = {}
                     if status == "passed" then
-                        kept = kept + 1
-                        local hits = {}
+                        dryRunSteps[id] = Runtime.steps
                         for hit in pairs(Runtime.hits) do
                             table.insert(hits, hit)
                         end
                         table.sort(hits)
-                        appendLine(runPath(runId, "coverage.jsonl"), {
-                            test = id,
-                            status = status,
-                            durationMs = Ext.Timer.MonotonicTime() - started,
-                            steps = Runtime.steps,
-                            hits = hits,
-                        })
                     end
+                    appendLine(runPath(runId, "coverage.jsonl"), {
+                        test = id,
+                        status = status,
+                        durationMs = clock() - started,
+                        steps = Runtime.steps,
+                        hits = hits,
+                    })
                 end
             end, function(e) return tostring(e) end)
             Runtime.hits, Runtime.steps = nil, 0
             if not ok then
                 error(err, 0)
-            end
-            if kept == 0 then
-                error("no test left after dropping skipped tests", 0)
             end
         end)
     end
@@ -263,13 +269,27 @@ function Agent.Create(deps)
                 error("no prepared run; call Prepare first", 0)
             end
             local result = { mutantId = mutantId, killedBy = {}, passed = 0, failed = 0, skipped = 0, attempt = 1 }
-            local started = Ext.Timer.MonotonicTime()
+            local covered = 0
+            for _, id in ipairs(testIds) do
+                covered = covered + (dryRunSteps[id] or 0)
+            end
+            local started = clock()
+            Runtime.steps, Runtime.limitHit, Runtime.hits = 0, nil, nil
+            Runtime.stepLimit = math.max(MIN_STEP_LIMIT, STEP_LIMIT_FACTOR * covered)
+            Runtime.clock, Runtime.deadlineMs = clock, started + WALL_CLOCK_MS
             Runtime.a = mutantId
             local ok, run = xpcall(deps.run, function(e) return tostring(e) end, runOptions(testIds))
-            Runtime.a, Runtime.steps, Runtime.limitHit = 0, 0, nil
-            result.durationMs = Ext.Timer.MonotonicTime() - started
+            Runtime.a = 0
+            local limitHit = Runtime.limitHit
+            Runtime.steps, Runtime.limitHit = 0, nil
+            result.durationMs = clock() - started
 
-            if not ok then
+            if limitHit ~= nil then
+                result.status, result.message = "Timeout", LIMIT_MESSAGES[limitHit]
+                eachResult(ok and run.suites or nil, function(test)
+                    result[test.status] = (result[test.status] or 0) + 1
+                end)
+            elseif not ok then
                 result.status, result.message = "RuntimeError", run:match("[^\n]*")
             else
                 eachResult(run.suites, function(test)

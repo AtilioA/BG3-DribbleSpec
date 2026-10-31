@@ -3,8 +3,9 @@
 import asyncio
 import json
 import os
+import time
 from pathlib import Path
-from typing import Protocol
+from typing import Callable, Protocol
 
 from . import build_plan, format_mutant, ignored_per_file, load_config, next_run_id
 
@@ -13,13 +14,28 @@ EVAL_DEADLINE_S = 25.0
 MAX_EXPRESSION = 32768  # bg3se_console eval input limit
 
 
+LATE_LINE_WAIT_S = 60.0  # from the call's send time: the 25 s eval deadline, the agent's 20 s wall clock, margin
+LATE_LINE_POLL_S = 1.0
+DRY_RUN_BATCH_MS = 10000
+CALL_OVERHEAD = 200  # characters of an eval around its test id list
+
+
 class AgentError(Exception):
     pass
+
+
+class EvalOutcomeUnknown(AgentError):
+    """The eval may have run in game, but its result never came back (for example, a missed deadline)."""
+
+
+class GameUnresponsive(AgentError):
+    """No line arrived within the wait bound; the game may be hung, so no further call is sent."""
 
 
 class Agent(Protocol):
     """The `Mods.Dribbles.Mutation` calls; each returns the agent's status string."""
 
+    def generation(self) -> int | None: ...
     def prepare(self, run_id: str) -> str: ...
     def dry_run(self, run_id: str, test_ids: list[str]) -> str: ...
     def run_mutant(self, run_id: str, mutant_id: int, test_ids: list[str]) -> str: ...
@@ -58,11 +74,13 @@ class ConsoleAgent:
 
     def __init__(self):
         try:
+            from bg3se_console.broker import BrokerDisconnected
             from bg3se_console.core import AgentRuntime
             from bg3se_console.mcp import SharedRuntimeSession
         except ImportError:
             raise AgentError("bg3se_console is not installed; run `uv pip install -e "
                              "C:/Users/AAD/Git/llm-skills/.agents/skills/bg3se-console-ops/bg3se-console-mcp`") from None
+        self._broker_disconnected = BrokerDisconnected
         self._loop = asyncio.Runner()
         self._session = SharedRuntimeSession(AgentRuntime)
         self._loop.run(self._session.start())
@@ -73,14 +91,25 @@ class ConsoleAgent:
         finally:
             self._loop.close()
 
+    def _run(self, name: str, coro):
+        try:
+            return self._loop.run(coro)
+        except self._broker_disconnected as e:
+            raise AgentError(f"{name}: broker disconnected: {e}") from None
+
+    def generation(self) -> int | None:
+        return self._run("status", self._session.status()).contexts.server.generation
+
     def _call(self, name: str, args: str) -> str:
         expression = f"Ext.Json.Stringify({{ Mods.Dribbles.Mutation.{name}({args}) }})"
         if len(expression) > MAX_EXPRESSION:
             raise AgentError(f"{name} call is {len(expression)} characters; the console limit is {MAX_EXPRESSION}")
-        response = self._loop.run(self._session.eval("server", expression, EVAL_DEADLINE_S))
+        response = self._run(name, self._session.eval("server", expression, EVAL_DEADLINE_S))
         if response.outcome != "succeeded":
-            message = response.error.message if response.error else response.outcome
-            raise AgentError(f"{name} eval failed: {message}")
+            error = f"{response.error.code}: {response.error.message}" if response.error else response.outcome
+            if response.outcome == "unknown":
+                raise EvalOutcomeUnknown(f"{name} eval outcome unknown: {error}")
+            raise AgentError(f"{name} eval failed: {error}")
         return decode_result(response.result or "")
 
     def prepare(self, run_id: str) -> str:
@@ -111,7 +140,7 @@ def read_jsonl(path: Path) -> list[dict]:
             records.append(json.loads(line))
         except json.JSONDecodeError:
             if i != len(lines) - 1:
-                raise
+                raise AgentError(f"{path}: line {i + 1} is not valid JSON") from None
     return records
 
 
@@ -127,14 +156,76 @@ def _host_result(mutant_id: int, status: str, message: str | None = None) -> dic
     return result | {"killedBy": [], "passed": 0, "failed": 0, "skipped": 0, "durationMs": 0, "attempt": 1}
 
 
-def _run_agent(plan: dict, run_dir: Path, agent: Agent) -> None:
+def _resume_hint(run_id: str) -> str:
+    return f"run {run_id} stopped; resume it with `dribblespec-mutate resume {run_id}`"
+
+
+def _check_generation(agent: Agent, generation: int | None, run_id: str) -> None:
+    current = agent.generation()
+    if current is not None and current != generation:
+        raise AgentError(f"the server Lua context generation changed; {_resume_hint(run_id)}")
+
+
+def _wait_for_line(path: Path, found: Callable[[dict], bool], sent: float, agent: Agent, generation: int | None,
+                   run_id: str) -> bool:
+    """After an unknown eval outcome, poll `path` until a line matches; False past the bound."""
+    while True:
+        _check_generation(agent, generation, run_id)
+        if any(found(r) for r in read_jsonl(path)):
+            return True
+        if time.monotonic() - sent >= LATE_LINE_WAIT_S:
+            return False
+        time.sleep(LATE_LINE_POLL_S)
+
+
+def _append_timeout(path: Path, mutant_id: int) -> None:
+    # Drop a partial agent line so the host line starts on a line of its own.
+    data = path.read_bytes() if path.exists() else b""
+    with open(path, "wb") as f:
+        f.write(data[:data.rfind(b"\n") + 1])
+        f.write((json.dumps(_host_result(mutant_id, "Timeout", "no result line after the eval deadline")) + "\n")
+                .encode("utf-8"))
+
+
+def _dry_run(run_id: str, run_dir: Path, agent: Agent, test_ids: list[str], generation: int | None) -> list[dict]:
+    """Send DryRun in batches: one test first, then as many as fit the measured mean duration and the console limit."""
+    path = run_dir / "coverage.jsonl"
+    start = 0
+    size = 1
+    while start < len(test_ids):
+        batch = [test_ids[start]]
+        length = CALL_OVERHEAD + len(lua_str(test_ids[start]))
+        while len(batch) < size and start + len(batch) < len(test_ids):
+            item = len(lua_str(test_ids[start + len(batch)])) + 2  # ", " separator
+            if length + item > MAX_EXPRESSION:
+                break
+            length += item
+            batch.append(test_ids[start + len(batch)])
+        _check_generation(agent, generation, run_id)
+        sent = time.monotonic()
+        try:
+            _check("DryRun", agent.dry_run(run_id, batch))
+        except EvalOutcomeUnknown:
+            last = batch[-1]
+            if not _wait_for_line(path, lambda c: c["test"] == last, sent, agent, generation, run_id):
+                raise GameUnresponsive(f"DryRun: no line after the eval deadline (game hung or batch failed); {_resume_hint(run_id)}")
+        start += len(batch)
+        durations = [c["durationMs"] for c in read_jsonl(path)]
+        if durations:
+            size = max(1, int(DRY_RUN_BATCH_MS // max(sum(durations) / len(durations), 1)))
+    coverage = read_jsonl(path)
+    if not any(c["status"] == "passed" for c in coverage):
+        raise AgentError("DryRun: no test left after dropping skipped tests")
+    return coverage
+
+
+def _run_agent(plan: dict, run_dir: Path, agent: Agent, generation: int | None) -> None:
     """Dry run, append the host-classified results, then run each covered mutant."""
     run_id = plan["runId"]
     test_ids = json.loads((run_dir / "tests.json").read_text(encoding="utf-8"))
     if not test_ids:
         raise AgentError(f"no tests match the test filter {json.dumps(plan['testFilter'])}")
-    _check("DryRun", agent.dry_run(run_id, test_ids))
-    coverage = read_jsonl(run_dir / "coverage.jsonl")
+    coverage = _dry_run(run_id, run_dir, agent, test_ids, generation)
     covering = {m["id"]: [c["test"] for c in coverage if m["id"] in (c["hits"] or [])] for m in plan["mutants"]}
     with open(run_dir / "results.jsonl", "a", encoding="utf-8") as f:
         for m in plan["mutants"]:
@@ -144,7 +235,16 @@ def _run_agent(plan: dict, run_dir: Path, agent: Agent) -> None:
                 f.write(json.dumps(_host_result(m["id"], "NoCoverage")) + "\n")
     for m in plan["mutants"]:
         if "ignoredReason" not in m and covering[m["id"]]:
-            _check(f"RunMutant {m['id']}", agent.run_mutant(run_id, m["id"], covering[m["id"]]))
+            _check_generation(agent, generation, run_id)
+            sent = time.monotonic()
+            try:
+                _check(f"RunMutant {m['id']}", agent.run_mutant(run_id, m["id"], covering[m["id"]]))
+            except EvalOutcomeUnknown:
+                path = run_dir / "results.jsonl"
+                if not _wait_for_line(path, lambda r: r.get("mutantId") == m["id"], sent, agent, generation, run_id):
+                    _append_timeout(path, m["id"])
+                    raise GameUnresponsive(
+                        f"RunMutant {m['id']}: no line after the eval deadline (game hung or batch failed); {_resume_hint(run_id)}") from None
 
 
 def run_plan(plan: dict, chunks: dict[str, str], root: Path, agent: Agent) -> dict[int, dict]:
@@ -158,9 +258,14 @@ def run_plan(plan: dict, chunks: dict[str, str], root: Path, agent: Agent) -> di
 
     _check("Prepare", agent.prepare(run_id))
     try:
-        _run_agent(plan, run_dir, agent)
+        _run_agent(plan, run_dir, agent, agent.generation())
+    except GameUnresponsive:
+        raise  # the game may be hung; resume calls Restore, then Prepare
     except AgentError as e:
-        status = agent.restore(run_id)
+        try:
+            status = agent.restore(run_id)
+        except AgentError as restore_error:
+            status = str(restore_error)
         if status != "ok":
             raise AgentError(f"{e}; Restore: {status}") from e
         raise
