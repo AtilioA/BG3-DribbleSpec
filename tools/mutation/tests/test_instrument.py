@@ -2,7 +2,7 @@ import itertools
 
 import pytest
 
-from dribblespec_mutate.instrument import ALIASES, CAPTURES, STATIC, SourceError, instrument
+from dribblespec_mutate.instrument import _PARSER, ALIASES, CAPTURES, STATIC, SourceError, _walk, instrument
 
 
 def mutate_text(source: str, mutant) -> str:
@@ -11,8 +11,35 @@ def mutate_text(source: str, mutant) -> str:
     line = lines[mutant.line - 1]
     col = mutant.column - 1
     assert line[col : col + len(mutant.original)] == mutant.original
-    lines[mutant.line - 1] = line[:col] + mutant.replacement + line[col + len(mutant.original) :]
-    return "\n".join(lines)
+    start = sum(len(l) + 1 for l in lines[: mutant.line - 1]) + col
+    end = start + len(mutant.original)
+    if mutant.operator == "LogicalOperator":
+        # `or` binds looser than `and`, so parenthesise to keep the tree of the original expression.
+        node = next(n for n in _walk(_PARSER.parse(source.encode()).root_node)
+                    if n.type == "binary_expression" and n.child_by_field_name("operator").start_byte == start)
+        left, right = node.child_by_field_name("left"), node.child_by_field_name("right")
+        b = source.encode()
+        text = f"(({b[left.start_byte:left.end_byte].decode()}) {mutant.replacement} ({b[right.start_byte:right.end_byte].decode()}))"
+        return (b[: node.start_byte] + text.encode() + b[node.end_byte :]).decode()
+    if mutant.operator == "RemoveCall":
+        end = _balanced(source, source.index("(", end))
+    elif mutant.operator in ("ConditionTrue", "ConditionFalse"):
+        end = _balanced(source, start, stop=" then")
+    gap = "".join(c for c in source[start:end] if c == "\n")
+    return source[:start] + mutant.replacement + gap + source[end:]
+
+
+def _balanced(source: str, pos: int, stop: str | None = None) -> int:
+    """End of the parenthesised group at pos, or of the text before `stop` at bracket depth 0 (no strings)."""
+    depth = 0
+    while True:
+        if stop and depth == 0 and source.startswith(stop, pos):
+            return pos
+        c = source[pos]
+        depth += (c in "([{") - (c in ")]}")
+        pos += 1
+        if not stop and depth == 0:
+            return pos
 
 
 FIXTURE = """\
@@ -184,7 +211,7 @@ function A_f(x) return h(x) end
 function A_swap() t.n = 1; h = function() return true end end
 """
     _same_behaviour(src, ["A_f(5)", "A_swap()", "A_f(5)"])
-    assert _reasons(src) == {2: {CAPTURES}}
+    assert _reasons(src) == {2: {CAPTURES}, 4: {CAPTURES}}
 
 
 def test_function_statement_on_a_local_is_an_assignment():
@@ -250,7 +277,7 @@ def test_local_function_mutants_are_reached_through_the_target():
 
     result = instrument(LOCAL_FIXTURE.encode())
     assert result.targets == ["C.Validate"]
-    assert all(m.ignoredReason is None for m in result.mutants) and len(result.mutants) == 6
+    assert all(m.ignoredReason is None for m in result.mutants) and len(result.mutants) == 13
     inputs = [[0, 1, 0.5], [1, 1], [-0.1, 0, 0], [0, 0, 1.1], [0, 1, 0], [1, 1, 1, 1]]
     for active in [0] + [m.id for m in result.mutants]:
         oracle, subject = Lua(), Lua()
@@ -265,8 +292,8 @@ def test_local_function_mutants_are_reached_through_the_target():
 def test_step_counter_at_function_entry_and_every_loop_body():
     src = "function F(t) while true do end for i=1,2 do end for k in t do end repeat until true end\n"
     assert instrument(src.encode()).chunk == (
-        "local __M = Mods.Dribbles.Mutation.Runtime; function F(t) __M.S(); while true do __M.S(); end"
-        " for i=1,2 do __M.S(); end for k in t do __M.S(); end repeat __M.S(); until true end\n"
+        "local __M = Mods.Dribbles.Mutation.Runtime; function F(t) __M.S(); while (not __M.On(1)) do __M.S(); end"
+        " for i=1,2 do __M.S(); end for k in t do __M.S(); end repeat __M.S(); until (not __M.On(2)) end\n"
     )
 
 
@@ -293,8 +320,9 @@ def test_each_active_mutant_matches_the_textual_mutation():
     from conftest import Lua
 
     result = instrument(FIXTURE.encode())
-    patched = [m for m in result.mutants if m.ignoredReason is None]
-    assert len(patched) == 14  # Vec.Less, Vec.AtMost, Odd.Gt, Odd.Le, and three InRange sites
+    # Flipping the loop literals in InRange (`while false`, `until true`) never terminates; OPS_FIXTURE covers booleans.
+    patched = [m for m in result.mutants if m.ignoredReason is None and m.operator != "BooleanLiteral"]
+    assert len(patched) == 16  # Vec.Less, Vec.AtMost, Odd.Gt, Odd.Le, and InRange: three relational, one logical, one arithmetic
     for m in patched:
         oracle, subject = Lua(), Lua()
         install(oracle, mutate_text(FIXTURE, m))
@@ -338,3 +366,145 @@ def test_bom_is_dropped_so_the_prefix_comes_first(lua):
     chunk = instrument(src).chunk
     assert chunk.startswith("local __M = ")
     lua.compile(chunk)
+
+
+OPS_FIXTURE = """\
+Calls = 0
+function bump(v) Calls = Calls + 1 return v end
+function multi() return 1, 2 end
+MT = {
+    __eq = function(a, b) return a.n == b.n end,
+    __add = function(a, b) return a.n + b.n + 100 end,
+    __sub = function(a, b) return a.n - b.n - 100 end,
+    __mul = function(a, b) return a.n * b.n * 10 end,
+    __div = function(a, b) return a.n / b.n / 10 end,
+}
+function W(n) return setmetatable({ n = n }, MT) end
+function Eq(a, b) return W(a) == W(b), a ~= b, multi() == 1 end
+function Ar(a, b) return W(a) + W(b), W(a) - W(b), W(a) * W(b), W(a) / W(b), a + multi(), a - b end
+function Lg(a, b)
+    return bump(a) and bump(b), bump(a) or bump(b), a and b and a
+        and b, (a or (b or (a and b))), a and multi(), Calls
+end
+function Nt(a) return not a, not not a, true, false end
+function Cd(a, b)
+    local r = 0
+    if bump(a) then r = 1 elseif not b then r = 2 elseif a and
+        b then r = 3 else r = 4 end
+    return r, Calls
+end
+function Log(a) Calls = Calls + 100 end
+function Rm(a) bump(a) Log(a) bump(a)
+    if a then bump(a) end return Calls end
+"""
+
+OPS_CALLS = {
+    "Eq": list(itertools.product([1, 2], [1, 2])),
+    "Ar": list(itertools.product([1, 3], [1, 2])),
+    "Lg": list(itertools.product([False, None, 0, 1], [False, 1])),
+    "Nt": [(False,), (None,), (0,)],
+    "Cd": list(itertools.product([False, 1], [False, 1])),
+    "Rm": [(False,), (1,)],
+}
+
+
+def _outcome(lua, name, *args):
+    try:
+        return _call(lua, name, *args)
+    except Exception:
+        return "error"
+
+
+def _differential(src: str, ignore_calls=()):
+    from conftest import Lua
+
+    result = instrument(src.encode(), ignore_calls=list(ignore_calls))
+    patched = [m for m in result.mutants if m.ignoredReason is None]
+    for m in [None] + patched:
+        oracle, subject = Lua(), Lua()
+        install(oracle, mutate_text(src, m) if m else src)
+        install(subject, src, result.chunk)
+        subject.runtime.a = m.id if m else 0
+        for name, inputs in OPS_CALLS.items():
+            for args in inputs:
+                assert _outcome(subject, name, *args) == _outcome(oracle, name, *args), (m, name, args)
+    return result
+
+
+def test_every_operator_matches_its_textual_mutation():
+    result = _differential(OPS_FIXTURE)
+    ops = {m.operator for m in result.mutants}
+    assert ops == {"EqualityOperator", "ArithmeticOperator", "LogicalOperator", "RemoveNot", "BooleanLiteral",
+                   "ConditionTrue", "ConditionFalse", "RemoveCall"}
+    assert instrument(OPS_FIXTURE.encode()).chunk.count("\n") == OPS_FIXTURE.count("\n")
+
+
+def test_ignored_calls_produce_no_mutant_and_use_no_id():
+    result = _differential(OPS_FIXTURE, ignore_calls=["Log"])
+    calls = [m.original for m in result.mutants if m.operator == "RemoveCall"]
+    assert calls == ["bump", "bump", "bump"]
+    ids = [m.id for m in result.mutants]
+    assert ids == list(range(1, len(ids) + 1))
+
+
+def test_mutant_texts_per_operator():
+    src = "function F(a, b)\n  if a == b then f(a) end\n  return a ~= b, a + b, a - b, a * b, a / b, a and b, a or b, not a, true, false\nend\n"
+    got = [(m.operator, m.original, m.replacement) for m in instrument(src.encode()).mutants]
+    assert got == [
+        ("ConditionTrue", "a == b", "true"), ("ConditionFalse", "a == b", "false"),
+        ("EqualityOperator", "==", "~="), ("RemoveCall", "f", ""),
+        ("EqualityOperator", "~=", "=="), ("ArithmeticOperator", "+", "-"), ("ArithmeticOperator", "-", "+"),
+        ("ArithmeticOperator", "*", "/"), ("ArithmeticOperator", "/", "*"),
+        ("LogicalOperator", "and", "or"), ("LogicalOperator", "or", "and"),
+        ("RemoveNot", "not", ""), ("BooleanLiteral", "true", "false"), ("BooleanLiteral", "false", "true"),
+    ]
+
+
+def test_condition_original_is_its_first_line_up_to_60_chars():
+    src = "function F(a)\n  if a == 1 or\n     a == 2 then return 1 end\n  if " + "a.b" * 30 + " then end\nend\n"
+    conds = [m.original for m in instrument(src.encode()).mutants if m.operator == "ConditionTrue"]
+    assert conds == ["a == 1 or", ("a.b" * 30)[:60]]
+
+
+def test_chunk_level_calls_are_not_mutated():
+    assert instrument(b"RequireFiles('x')\nfunction F() g() end\n").mutants[0].original == "g"
+    assert len(instrument(b"RequireFiles('x')\n").mutants) == 0
+
+
+@pytest.mark.parametrize("nest", [lambda n: " and ".join(["a"] * n), lambda n: "(a and " * (n - 1) + "a" + ")" * (n - 1)])
+def test_logical_chain_chunk_grows_linearly(nest):
+    size = lambda n: len(instrument(f"function F(a) return {nest(n)} end\n".encode()).chunk)
+    assert size(20) - size(10) < 2.5 * (size(10) - size(5))
+
+
+def test_logical_sites_with_varargs_or_debug_are_ignored_and_left_as_written(lua):
+    src = "function V(...) return ... and 1, ... == 1 end\nfunction D(a, b) local d = debug return a and b end\n"
+    result = instrument(src.encode())
+    reasons = {(m.line, m.operator): m.ignoredReason for m in result.mutants}
+    assert reasons == {(1, "LogicalOperator"): "varargs", (1, "EqualityOperator"): None,
+                       (2, "LogicalOperator"): "references debug"}
+    assert "... and 1" in result.chunk and "a and b" in result.chunk
+    lua.compile(result.chunk)
+
+
+def test_source_using_the_reserved_prefix_fails_hard():
+    with pytest.raises(SourceError, match="__M"):
+        instrument(b"function F() local __Ml = 1 return __Ml end\n")
+
+
+def test_sites_in_kept_statements_are_static_and_rendered_as_written():
+    src = "local DEBUG = false\nfunction A.f(x) return DEBUG end\n"
+    result = instrument(src.encode())
+    assert [(m.line, m.operator, m.ignoredReason) for m in result.mutants] == [(1, "BooleanLiteral", STATIC)]
+    assert result.chunk.splitlines()[0].endswith("local DEBUG = false")
+
+
+def test_debug_as_a_field_name_is_not_a_reference():
+    src = "function F(c) return c.debug and 1, { debug = 1 } end\n"
+    assert {m.ignoredReason for m in instrument(src.encode()).mutants} == {None}
+
+
+def test_literal_condition_has_only_its_boolean_literal_mutant():
+    src = "function F() if true then return 1 elseif false then return 2 end if (true) then return 3 end end\n"
+    assert [(m.operator, m.original) for m in instrument(src.encode()).mutants] == [
+        ("BooleanLiteral", "true"), ("BooleanLiteral", "false"), ("BooleanLiteral", "true")]

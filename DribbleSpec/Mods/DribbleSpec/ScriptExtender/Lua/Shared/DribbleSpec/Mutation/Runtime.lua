@@ -13,20 +13,33 @@ local R = { a = 0, hits = nil, steps = 0, stepLimit = math.maxinteger, deadlineM
 
 local DEADLINE_CHECK_INTERVAL = 1000
 
--- Replacements per relational operator: mutant `id` takes [1], `id + 1` takes [2].
+-- Replacements per comparison operator: mutant `id + i - 1` takes [i].
 local RELATIONAL = {
     ["<"] = { "<=", ">=" },
     ["<="] = { "<", ">" },
     [">"] = { ">=", "<=" },
     [">="] = { ">", "<" },
+    ["=="] = { "~=" },
+    ["~="] = { "==" },
 }
+
+local ARITH = { ["+"] = "-", ["-"] = "+", ["*"] = "/", ["/"] = "*" }
 
 -- Applies `op` literally so metamethod dispatch matches the original expression.
 local function compare(op, a, b)
     if op == "<" then return a < b end
     if op == "<=" then return a <= b end
     if op == ">" then return a > b end
-    return a >= b
+    if op == ">=" then return a >= b end
+    if op == "==" then return a == b end
+    return a ~= b
+end
+
+local function arith(op, a, b)
+    if op == "+" then return a + b end
+    if op == "-" then return a - b end
+    if op == "*" then return a * b end
+    return a / b
 end
 
 --- Records hits for ids `id .. id + count - 1` while coverage is on.
@@ -57,22 +70,58 @@ function R.S()
     end
 end
 
---- Relational mutation site; `id` and `id + 1` are its two mutants.
+--- Comparison site; ids `id .. id + #replacements - 1` are its mutants.
 ---@param id integer
----@param op "<"|"<="|">"|">="
+---@param op "<"|"<="|">"|">="|"=="|"~="
 ---@param a any
 ---@param b any
 ---@return boolean
 function R.Cmp(id, op, a, b)
     local alt = RELATIONAL[op]
-    R.Hit(id, 2)
-    local active = R.a
-    if active == id then
-        op = alt[1]
-    elseif active == id + 1 then
-        op = alt[2]
+    if alt == nil then
+        error("DribbleSpecMutation: unknown operator " .. tostring(op), 2)
+    end
+    R.Hit(id, #alt)
+    local i = R.a - id + 1
+    if alt[i] ~= nil then
+        op = alt[i]
     end
     return compare(op, a, b)
+end
+
+--- Arithmetic site: `+`/`-` and `*`/`/` swap while `id` is active.
+---@param id integer
+---@param op "+"|"-"|"*"|"/"
+---@param a any
+---@param b any
+---@return any
+function R.Arith(id, op, a, b)
+    local alt = ARITH[op]
+    if alt == nil then
+        error("DribbleSpecMutation: unknown operator " .. tostring(op), 2)
+    end
+    R.Hit(id, 1)
+    if R.a == id then
+        op = alt
+    end
+    return arith(op, a, b)
+end
+
+--- Records a hit for `id` and returns whether it is the active mutant.
+---@param id integer
+---@return boolean
+function R.On(id)
+    R.Hit(id, 1)
+    return R.a == id
+end
+
+--- `not x`, or `x` itself while `id` is active.
+---@param id integer
+---@param x any
+---@return any
+function R.Not(id, x)
+    if R.On(id) then return x end
+    return not x
 end
 
 return R

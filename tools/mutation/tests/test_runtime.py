@@ -63,3 +63,38 @@ def test_deadline_checked_against_injected_clock_every_1000_steps(lua):
     assert lua.runtime.limitHit == "time"
     with pytest.raises(LuaError, match="limit"):
         lua.runtime.S()
+
+
+def test_cmp_equality_has_one_mutant_and_one_hit(lua):
+    r = lua.runtime
+    lua.rt.execute("Mods.Dribbles.Mutation.Runtime.hits = {}")
+    assert r.Cmp(3, "==", 1, 1) is True and r.Cmp(5, "~=", 1, 1) is False
+    assert dict(r.hits) == {3: True, 5: True}
+    r.a = 3
+    assert r.Cmp(3, "==", 1, 1) is False
+    r.a = 5
+    assert r.Cmp(5, "~=", 1, 1) is True
+
+
+def test_unknown_operator_raises(lua):
+    with pytest.raises(LuaError, match="operator"):
+        lua.runtime.Cmp(1, "=", 1, 1)
+    with pytest.raises(LuaError, match="operator"):
+        lua.runtime.Arith(1, "%", 1, 1)
+
+
+def test_arith_swaps_plus_minus_and_times_divide(lua):
+    r = lua.runtime
+    assert [r.Arith(1, op, 6, 2) for op in "+-*/"] == [8, 4, 12, 3]
+    r.a = 1
+    assert [r.Arith(1, op, 6, 2) for op in "+-*/"] == [4, 8, 3, 12]
+
+
+def test_on_and_not_record_hits_and_not_returns_the_raw_operand(lua):
+    r = lua.runtime
+    lua.rt.execute("Mods.Dribbles.Mutation.Runtime.hits = {}")
+    assert r.On(1) is False and r.Not(2, 0) is False
+    assert dict(r.hits) == {1: True, 2: True}
+    r.a = 2
+    assert r.Not(2, 0) == 0
+    assert r.On(2) is True

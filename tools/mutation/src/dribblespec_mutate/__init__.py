@@ -62,7 +62,7 @@ def build_plan(config: Config, run_id: str) -> tuple[dict, dict[str, str]]:
     for index, rel in enumerate(paths, start=1):
         source = (lua_root / rel).read_bytes()
         try:
-            result = instrument(source, first_id=len(mutants) + 1)
+            result = instrument(source, first_id=len(mutants) + 1, ignore_calls=config.ignoreCalls)
         except SourceError as e:
             raise SourceError(f"{rel}: {e}") from None
         patch_path = f"DribbleSpecMutation/{run_id}/{index}.lua"

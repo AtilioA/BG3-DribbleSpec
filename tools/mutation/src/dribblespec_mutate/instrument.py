@@ -1,5 +1,6 @@
 """Parse a Lua file, find mutation sites, and build its line-preserving patch chunk."""
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 import tree_sitter_lua
@@ -12,6 +13,9 @@ STATIC = "static"
 CAPTURES = "captures file-local state"
 ALIASES = "aliases a target"
 
+VARARGS = "varargs"
+REFERENCES_DEBUG = "references debug"
+
 # Each relational operator yields two mutants, in this order.
 RELATIONAL = {
     "<": ("<=", ">="),
@@ -19,6 +23,9 @@ RELATIONAL = {
     ">": (">=", "<="),
     ">=": (">", "<"),
 }
+EQUALITY = {"==": "~=", "~=": "=="}
+ARITH = {"+": "-", "-": "+", "*": "/", "/": "*"}
+LOGICAL = {"and": "or", "or": "and"}
 
 _PARSER = Parser(Language(tree_sitter_lua.language()))
 
@@ -123,13 +130,49 @@ def _references(body: Node, names) -> set[str]:
     return found
 
 
-def _relational_sites(node: Node):
-    for n in _walk(node):
-        if n.type == "binary_expression" and n.child_by_field_name("operator").type in RELATIONAL:
-            yield n
+def _first_line(text: str) -> str:
+    return text.splitlines()[0].rstrip()[:60]
 
 
-def instrument(source: bytes, first_id: int = 1) -> Instrumented:
+def _enclosing_function(node: Node) -> Node | None:
+    while node is not None and node.type not in ("function_declaration", "function_definition"):
+        node = node.parent
+    return node
+
+
+def _sites(stmt: Node, ignore_calls: set[str]):
+    """(node, kind, operator, mutants as (operator name, original, replacement, anchor node)) in pre-order."""
+    for n in _walk(stmt):
+        if n.type == "binary_expression":
+            op = n.child_by_field_name("operator")
+            if op.type in RELATIONAL:
+                yield n, "cmp", [("RelationalBoundary", op.type, r, op) for r in RELATIONAL[op.type]]
+            elif op.type in EQUALITY:
+                yield n, "cmp", [("EqualityOperator", op.type, EQUALITY[op.type], op)]
+            elif op.type in ARITH:
+                yield n, "arith", [("ArithmeticOperator", op.type, ARITH[op.type], op)]
+            elif op.type in LOGICAL:
+                yield n, "logical", [("LogicalOperator", op.type, LOGICAL[op.type], op)]
+        elif n.type == "unary_expression" and n.children[0].type == "not":
+            yield n, "not", [("RemoveNot", "not", "", n.children[0])]
+        elif n.type in ("true", "false") and n.child_count == 0:
+            yield n, "bool", [("BooleanLiteral", n.type, "false" if n.type == "true" else "true", n)]
+        elif n.type in ("if_statement", "elseif_statement"):
+            c = n.child_by_field_name("condition")
+            inner = c
+            while inner.type == "parenthesized_expression":
+                inner = inner.named_children[0]
+            if inner.type in ("true", "false"):
+                continue  # Its BooleanLiteral mutant already covers both forced values.
+            text = _first_line(c.text.decode())
+            yield c, "cond", [("ConditionTrue", text, "true", c), ("ConditionFalse", text, "false", c)]
+        elif n.type == "function_call" and n.parent.type == "block":
+            callee = n.child_by_field_name("name")
+            if callee.text.decode() not in ignore_calls:
+                yield n, "call", [("RemoveCall", callee.text.decode(), "", callee)]
+
+
+def instrument(source: bytes, first_id: int = 1, ignore_calls: Sequence[str] = ()) -> Instrumented:
     """Return the patch chunk, target names, and mutants (ids from first_id) for one file."""
     try:
         source.decode("utf-8")
@@ -143,6 +186,10 @@ def instrument(source: bytes, first_id: int = 1) -> Instrumented:
         bad = [n for n in _walk(root) if n.is_error or n.is_missing][-1]
         row, col = bad.start_point
         raise SourceError(f"syntax error at line {row + 1}, column {col + 1}")
+    reserved = next((n for n in _walk(root) if n.type == "identifier" and n.text.startswith(b"__M")), None)
+    if reserved is not None:
+        row, col = reserved.start_point
+        raise SourceError(f"identifier {reserved.text.decode()} at line {row + 1}, column {col + 1} uses the reserved prefix __M")
 
     funcs = [s for s in root.children if s.type == "function_declaration"]
     # Global function names: an alias of one (or of a table holding one) would capture the unpatched value.
@@ -238,41 +285,72 @@ def instrument(source: bytes, first_id: int = 1) -> Instrumented:
     rendered = installed | kept | {local_funcs[n].start_byte for n in rendered_lf}
     for name, stmt in local_funcs.items():
         reasons[stmt.start_byte] = None if name in patchable else lf_reason[name] or CAPTURES
+    # Kept statements run once at chunk load, outside any target, so their sites are static too.
     for stmt in root.children:
-        if stmt.start_byte in kept:
-            reasons[stmt.start_byte] = None
-        else:
-            reasons.setdefault(stmt.start_byte, STATIC)
+        reasons.setdefault(stmt.start_byte, STATIC)
 
     mutants: list[Mutant] = []
-    site_ids: dict[tuple[int, int], int] = {}
+    site_ids: dict[tuple[int, int, str], int] = {}  # (start, end, kind) -> first id; absent = rendered as written
     next_id = first_id
+    ignored_calls = set(ignore_calls)
     for stmt in root.children:
-        for site in _relational_sites(stmt):
-            op = site.child_by_field_name("operator")
-            row, col = op.start_point
-            site_ids[(site.start_byte, site.end_byte)] = next_id
-            for replacement in RELATIONAL[op.type]:
-                mutants.append(Mutant(next_id, "RelationalBoundary", op.type, replacement, row + 1, col + 1, reasons[stmt.start_byte]))
+        for site, kind, forms in _sites(stmt, ignored_calls):
+            reason = reasons[stmt.start_byte]
+            if reason is None and kind == "logical":
+                # The closure form cannot hold `...`, and it adds a stack frame that `debug` callers would see.
+                func = _enclosing_function(site)
+                if any(n.type == "vararg_expression" for n in _walk(site)):
+                    reason = VARARGS
+                elif func is not None and _references(func, {"debug"}):
+                    reason = REFERENCES_DEBUG
+            if reason is None:
+                site_ids[(site.start_byte, site.end_byte, kind)] = next_id
+            for operator, original, replacement, anchor in forms:
+                row, col = anchor.start_point
+                mutants.append(Mutant(next_id, operator, original, replacement, row + 1, col + 1, reason))
                 next_id += 1
 
-    def render(node: Node) -> str:
+    def newlines(start: int, end: int) -> str:
+        # Gaps around dropped or moved tokens may hold newlines; keep them so line numbers stay put.
+        return "".join(c for c in source[start:end].decode() if c in "\r\n")
+
+    def render(node: Node, skip_call: bool = False) -> str:
+        key = (node.start_byte, node.end_byte)
+        if node.type in ("true", "false") and (site_id := site_ids.get((*key, "bool"))) is not None:
+            return f"(not __M.On({site_id}))" if node.type == "true" else f"(__M.On({site_id}))"
         if node.child_count == 0:
             return node.text.decode()
-        site_id = site_ids.get((node.start_byte, node.end_byte))
-        if site_id is not None and node.type == "binary_expression":
-            left = render(node.child_by_field_name("left"))
-            right = render(node.child_by_field_name("right"))
-            op = node.child_by_field_name("operator").type
-            # Gaps around the operator may hold newlines; keep them so line numbers stay put.
-            gap = source[node.child_by_field_name("left").end_byte : node.child_by_field_name("right").start_byte].decode()
-            gap = "".join(c for c in gap if c in "\r\n")
-            return f'__M.Cmp({site_id}, "{op}", ({left}), {gap}({right}))'
+        if node.type == "binary_expression":
+            left_node, right_node = node.child_by_field_name("left"), node.child_by_field_name("right")
+            for kind in ("cmp", "arith", "logical"):
+                site_id = site_ids.get((*key, kind))
+                if site_id is None:
+                    continue
+                left, right = render(left_node), render(right_node)
+                gap = newlines(left_node.end_byte, right_node.start_byte)
+                op = node.child_by_field_name("operator").type
+                if kind == "logical":
+                    test = ("if __Ml then return __Ml end elseif not __Ml then return __Ml end" if op == "and"
+                            else "if not __Ml then return __Ml end elseif __Ml then return __Ml end")
+                    return (f"(function() local __Ml = ({left}) if __M.On({site_id}) then {test} "
+                            f"return {gap}({right}) end)()")
+                helper = "Cmp" if kind == "cmp" else "Arith"
+                return f'__M.{helper}({site_id}, "{op}", ({left}), {gap}({right}))'
+        if node.type == "unary_expression" and (site_id := site_ids.get((*key, "not"))) is not None:
+            operand = node.child_by_field_name("operand")
+            return f"__M.Not({site_id}, {newlines(node.start_byte, operand.start_byte)}({render(operand)}))"
+        if not skip_call and node.type == "function_call" and (site_id := site_ids.get((*key, "call"))) is not None:
+            return f"if not __M.On({site_id}) then {render(node, skip_call=True)} end"
         out = []
         pos = node.start_byte
         for child in node.children:
             out.append(source[pos : child.start_byte].decode())
-            out.append(render(child))
+            cond_id = site_ids.get((child.start_byte, child.end_byte, "cond"))
+            if cond_id is not None and child == node.child_by_field_name("condition"):
+                # A forced condition is not evaluated, as in the textual `if true then`.
+                out.append(f"(__M.On({cond_id}) or not __M.On({cond_id + 1}) and ({render(child)}))")
+            else:
+                out.append(render(child))
             pos = child.end_byte
             if child.type == "parameters" and node.type == "function_declaration":
                 out.append(" " + STEP)

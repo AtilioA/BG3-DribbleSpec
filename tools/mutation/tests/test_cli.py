@@ -78,7 +78,7 @@ def test_list_on_mcm_validators_includes_spike_mutants(tmp_path, capsys, lua):
         chunk = (tmp_path / f["patchPath"]).read_bytes().decode()
         assert (chunk.count("\n"), chunk.count("\r")) == (source.count("\n"), source.count("\r")), f["path"]
         lua.compile(chunk, "=" + f["path"])
-    assert "Shared/Helpers/Validators/ColorValidator.lua: 0 of 4 ignored\n" in out
+    assert "Shared/Helpers/Validators/ColorValidator.lua: 0 of 18 ignored\n" in out
     _check_color_validator(plan, lua_root, tmp_path)
 
 
