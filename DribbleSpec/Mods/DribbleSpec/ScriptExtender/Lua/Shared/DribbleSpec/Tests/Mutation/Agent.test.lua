@@ -195,8 +195,8 @@ DribbleSpec.describe("DribbleSpec Mutation agent", { tags = { "mutation" } }, fu
     DribbleSpec.test("RunMutant classifies Survived and Killed", function()
         writePlan(FIXTURE_HASH)
         agent.Prepare(RUN_ID)
-        Assertions.Equals(agent.RunMutant(RUN_ID, 1, { ABOVE }), "ok", "RunMutant 1")
-        Assertions.Equals(agent.RunMutant(RUN_ID, 2, { ABOVE }), "ok", "RunMutant 2")
+        Assertions.Equals(agent.RunMutant(RUN_ID, 1, { ABOVE }, 1), "ok", "RunMutant 1")
+        Assertions.Equals(agent.RunMutant(RUN_ID, 2, { ABOVE }, 1), "ok", "RunMutant 2")
         local lines = readLines("results.jsonl")
         Assertions.Equals(lines[1].status, "Survived", ">= to >")
         Assertions.Equals(lines[2].status, "Killed", ">= to <")
@@ -368,6 +368,31 @@ DribbleSpec.describe("DribbleSpec Mutation agent", { tags = { "mutation" } }, fu
         local line = readLines("checkpoint.jsonl")[1]
         Assertions.Equals(line.status, "failed", "status")
         Assertions.Equals(table.concat(line.failed, ","), SKIPPED, "failed")
+    end)
+
+    DribbleSpec.test("RunMutant records the attempt it is given", function()
+        writePlan(FIXTURE_HASH)
+        agent.Prepare(RUN_ID)
+        agent.RunMutant(RUN_ID, 1, { ABOVE }, 2)
+        Assertions.Equals(readLines("results.jsonl")[1].attempt, 2, "attempt")
+    end)
+
+    DribbleSpec.test("Prepare rebuilds the dry-run steps from coverage.jsonl", function()
+        writePlan(FIXTURE_HASH)
+        Ext.IO.SaveFile(DIR .. "coverage.jsonl", Ext.Json.Stringify({ test = LOOP, status = "passed", steps = 300,
+            hits = {}, durationMs = 0 }, { Beautify = false }) .. "\n" .. Ext.Json.Stringify({ test = SKIPPED,
+            status = "skipped", steps = 900, hits = {}, durationMs = 0 }, { Beautify = false }) .. "\n")
+        agent.Prepare(RUN_ID)
+        agent.RunMutant(RUN_ID, LOOP_ENDS, { LOOP, SKIPPED }, 1)
+        Assertions.Equals(agent.Runtime.stepLimit, 3000, "step limit from the passed line only")
+    end)
+
+    DribbleSpec.test("Restore clears an active mutant", function()
+        writePlan(FIXTURE_HASH)
+        agent.Prepare(RUN_ID)
+        agent.Runtime.a = 7
+        agent.Restore(RUN_ID)
+        Assertions.Equals(agent.Runtime.a, 0, "active mutant")
     end)
 
     DribbleSpec.test("Restore reinstalls the original function", function()

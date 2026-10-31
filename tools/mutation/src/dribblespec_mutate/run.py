@@ -5,6 +5,7 @@ import json
 import os
 import time
 from collections import Counter
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Protocol
 
@@ -19,6 +20,8 @@ LATE_LINE_WAIT_S = 60.0  # from the call's send time: the 25 s eval deadline, th
 LATE_LINE_POLL_S = 1.0
 DRY_RUN_BATCH_MS = 10000
 CALL_OVERHEAD = 200  # characters of an eval around its test id list
+RESET_WAIT_S = 60.0  # after a reset, until the mutation agent is loaded again
+RESET_POLL_S = 0.1
 
 
 class AgentError(Exception):
@@ -40,8 +43,10 @@ class Agent(Protocol):
     def prepare(self, run_id: str) -> str: ...
     def dry_run(self, run_id: str, test_ids: list[str]) -> str: ...
     def checkpoint(self, run_id: str, sets: list[tuple[int, tuple[str, ...]]]) -> str: ...
-    def run_mutant(self, run_id: str, mutant_id: int, test_ids: list[str]) -> str: ...
+    def run_mutant(self, run_id: str, mutant_id: int, test_ids: list[str], attempt: int) -> str: ...
     def restore(self, run_id: str) -> str: ...
+    def reset(self) -> None:
+        """Reset the server Lua context and return once it is available at a new generation."""
 
 
 def lua_str(value: str) -> str:
@@ -127,22 +132,41 @@ class ConsoleAgent:
     def checkpoint(self, run_id: str, sets: list[tuple[int, tuple[str, ...]]]) -> str:
         return self._call("Checkpoint", f"{lua_str(run_id)}, {{{', '.join(lua_set(i, t) for i, t in sets)}}}")
 
-    def run_mutant(self, run_id: str, mutant_id: int, test_ids: list[str]) -> str:
-        return self._call("RunMutant", f"{lua_str(run_id)}, {mutant_id}, {lua_list(test_ids)}")
+    def run_mutant(self, run_id: str, mutant_id: int, test_ids: list[str], attempt: int) -> str:
+        return self._call("RunMutant", f"{lua_str(run_id)}, {mutant_id}, {lua_list(test_ids)}, {attempt}")
 
     def restore(self, run_id: str) -> str:
         return self._call("Restore", lua_str(run_id))
+
+    def reset(self) -> None:
+        response = self._run("reset", self._session.reset("server", EVAL_DEADLINE_S))
+        server = next((c for c in response.contexts if c.context == "server"), None)
+        if response.outcome != "succeeded" or server is None or server.new_generation is None:
+            error = f"{response.error.code}: {response.error.message}" if response.error else response.outcome
+            raise AgentError(f"server reset failed: {error}")
+        deadline = time.monotonic() + RESET_WAIT_S
+        # Remove this check when the debugger reports mod load completion.
+        while True:
+            probe = self._run("eval", self._session.eval("server", "Mods.Dribbles ~= nil and Mods.Dribbles.Mutation ~= nil", 5))
+            if probe.outcome == "succeeded" and probe.result == "true":
+                return
+            if time.monotonic() >= deadline:
+                raise AgentError(f"the mutation agent was not loaded {RESET_WAIT_S:.0f} s after a server reset")
+            time.sleep(RESET_POLL_S)
 
 
 def se_user_root() -> Path:
     return Path(os.environ["LOCALAPPDATA"]) / "Larian Studios" / "Baldur's Gate 3" / "Script Extender"
 
 
-def read_jsonl(path: Path) -> list[dict]:
-    """Parse one JSON object per line; a truncated last line is ignored."""
+def read_jsonl(path: Path, offset: int = 0) -> list[dict]:
+    """Parse one JSON object per line from byte `offset`; a truncated last line is ignored."""
     if not path.exists():
         return []
-    lines = [line for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    with open(path, "rb") as f:
+        f.seek(offset)
+        text = f.read().decode("utf-8")
+    lines = [line for line in text.splitlines() if line.strip()]
     records = []
     for i, line in enumerate(lines):
         try:
@@ -169,39 +193,74 @@ def _resume_hint(run_id: str) -> str:
     return f"run {run_id} stopped; resume it with `dribblespec-mutate resume {run_id}`"
 
 
-def _check_generation(agent: Agent, generation: int | None, run_id: str) -> None:
-    current = agent.generation()
-    if current is not None and current != generation:
-        raise AgentError(f"the server Lua context generation changed; {_resume_hint(run_id)}")
+class GenerationChanged(Exception):
+    """The server Lua context generation changed while a line was pending."""
 
 
-def _wait_for_line(path: Path, found: Callable[[dict], bool], sent: float, agent: Agent, generation: int | None,
-                   run_id: str) -> bool:
-    """After an unknown eval outcome, poll `path` until a line matches; False past the bound."""
+@dataclass
+class _Run:
+    plan: dict
+    dir: Path
+    agent: Agent
+    generation: int | None = None
+
+    @property
+    def id(self) -> str:
+        return self.plan["runId"]
+
+    def arm(self) -> None:
+        """Restore, then Prepare: after a reattach Restore removes the kept patches; after a reset it is a no-op."""
+        _check("Restore", self.agent.restore(self.id))
+        _check("Prepare", self.agent.prepare(self.id))
+        self.generation = self.agent.generation()
+
+    def generation_changed(self) -> bool:
+        current = self.agent.generation()
+        return current is not None and current != self.generation
+
+    def before_call(self) -> None:
+        if self.generation_changed():
+            self.arm()
+
+    def recover(self) -> None:
+        self.agent.reset()
+        self.arm()
+
+
+def _size(path: Path) -> int:
+    return path.stat().st_size if path.exists() else 0
+
+
+def _wait_for_line(run: _Run, path: Path, offset: int, found: Callable[[dict], bool], sent: float) -> bool:
+    """After an unknown eval outcome, poll `path` past `offset` until a line matches; False past the bound."""
     while True:
-        _check_generation(agent, generation, run_id)
-        if any(found(r) for r in read_jsonl(path)):
+        if run.generation_changed():
+            raise GenerationChanged
+        if any(found(r) for r in read_jsonl(path, offset)):
             return True
         if time.monotonic() - sent >= LATE_LINE_WAIT_S:
             return False
         time.sleep(LATE_LINE_POLL_S)
 
 
-def _append_timeout(path: Path, mutant_id: int) -> None:
+def _append_timeout(path: Path, mutant_id: int, attempt: int) -> None:
     # Drop a partial agent line so the host line starts on a line of its own.
     data = path.read_bytes() if path.exists() else b""
     with open(path, "wb") as f:
         f.write(data[:data.rfind(b"\n") + 1])
-        f.write((json.dumps(_host_result(mutant_id, "Timeout", "no result line after the eval deadline")) + "\n")
-                .encode("utf-8"))
+        line = _host_result(mutant_id, "Timeout", "no result line after the eval deadline") | {"attempt": attempt}
+        f.write((json.dumps(line) + "\n").encode("utf-8"))
 
 
-def _send_batched(name: str, items: list, item_text: Callable[[object], str], send: Callable[[list], str],
-                  path: Path, is_last: Callable[[dict, object], bool], run_id: str, agent: Agent,
-                  generation: int | None) -> None:
-    """Send `items` in batches: one first, then as many as fit the measured mean duration and the console limit."""
+def _send_batched(run: _Run, name: str, items: list, item_text: Callable[[object], str],
+                  send: Callable[[list], str], path: Path, is_last: Callable[[dict, object], bool]) -> None:
+    """Send `items` in batches: one first, then as many as fit the measured mean duration and the console limit.
+
+    A batch pending across a generation change is sent again once, after re-arming.
+    """
     start = 0
     size = 1
+    resent = False
     while start < len(items):
         batch = [items[start]]
         length = CALL_OVERHEAD + len(item_text(items[start]))
@@ -211,26 +270,35 @@ def _send_batched(name: str, items: list, item_text: Callable[[object], str], se
                 break
             length += item
             batch.append(items[start + len(batch)])
-        _check_generation(agent, generation, run_id)
-        sent = time.monotonic()
+        run.before_call()
+        offset, sent = _size(path), time.monotonic()
         try:
             _check(name, send(batch))
         except EvalOutcomeUnknown:
             last = batch[-1]
-            if not _wait_for_line(path, lambda r: is_last(r, last), sent, agent, generation, run_id):
-                raise GameUnresponsive(f"{name}: no line after the eval deadline (game hung or batch failed); {_resume_hint(run_id)}")
+            try:
+                if not _wait_for_line(run, path, offset, lambda r: is_last(r, last), sent):
+                    raise GameUnresponsive(f"{name}: no line after the eval deadline (game hung or batch failed); {_resume_hint(run.id)}")
+            except GenerationChanged:
+                if resent:
+                    raise GameUnresponsive(f"{name}: the context generation changed again while a line was pending; {_resume_hint(run.id)}") from None
+                run.arm()
+                resent = True
+                continue
         start += len(batch)
+        resent = False
         durations = [r["durationMs"] for r in read_jsonl(path)]
         if durations:
             size = max(1, int(DRY_RUN_BATCH_MS // max(sum(durations) / len(durations), 1)))
 
 
-def _dry_run(run_id: str, run_dir: Path, agent: Agent, test_ids: list[str], generation: int | None) -> list[dict]:
+def _dry_run(run: _Run, test_ids: list[str]) -> list[dict]:
     """Dry run every test, print the skipped count per reason, and return the passed tests' coverage."""
-    path = run_dir / "coverage.jsonl"
-    _send_batched("DryRun", test_ids, lua_str, lambda batch: agent.dry_run(run_id, batch), path,
-                  lambda c, last: c["test"] == last, run_id, agent, generation)
-    coverage = read_jsonl(path)
+    path = run.dir / "coverage.jsonl"
+    _send_batched(run, "DryRun", test_ids, lua_str, lambda batch: run.agent.dry_run(run.id, batch), path,
+                  lambda c, last: c["test"] == last)
+    # A batch sent again after a generation change repeats its lines; the last line per test wins.
+    coverage = list({c["test"]: c for c in read_jsonl(path)}.values())
     skipped = Counter(c["skipReason"] for c in coverage if c["status"] == "skipped")
     if skipped:
         print(f"Skipped at baseline: {skipped.total()}")
@@ -242,48 +310,101 @@ def _dry_run(run_id: str, run_dir: Path, agent: Agent, test_ids: list[str], gene
     return passed
 
 
-def _checkpoint(run_id: str, run_dir: Path, agent: Agent, covering: dict[int, list[str]],
-                generation: int | None) -> set[str]:
+def _check_sets(run: _Run, sets: list[tuple[str, ...]]) -> dict[tuple[str, ...], bool]:
+    """Run each set with no mutant; return whether it passed. Set indexes continue after those in checkpoint.jsonl."""
+    path = run.dir / "checkpoint.jsonl"
+    first = max((r["set"] for r in read_jsonl(path)), default=0) + 1
+    indexed = list(enumerate(sets, start=first))
+    _send_batched(run, "Checkpoint", indexed, lambda s: lua_set(*s), lambda batch: run.agent.checkpoint(run.id, batch),
+                  path, lambda r, last: r["set"] == last[0])
+    status = {r["set"]: r["status"] for r in read_jsonl(path)}
+    return {tests: status.get(index) == "passed" for index, tests in indexed}
+
+
+def _checkpoint(run: _Run, covering: dict[int, list[str]]) -> set[str]:
     """Run each distinct covering set with no mutant; exclude every test of a failing set until all sets pass."""
-    path = run_dir / "checkpoint.jsonl"
     excluded: set[str] = set()
     passed: set[tuple[str, ...]] = set()
-    index = 0
     while True:
         pending = list(dict.fromkeys(tuple(t for t in tests if t not in excluded) for tests in covering.values()))
         pending = [s for s in pending if s and s not in passed]
         if not pending:
             break
-        sets = []
-        for tests in pending:
-            index += 1
-            sets.append((index, tests))
-        by_index = dict(sets)
-        _send_batched("Checkpoint", sets, lambda s: lua_set(*s), lambda batch: agent.checkpoint(run_id, batch), path,
-                      lambda r, last: r["set"] == last[0], run_id, agent, generation)
-        for line in read_jsonl(path):
-            if line["set"] in by_index:
-                if line["status"] == "passed":
-                    passed.add(by_index[line["set"]])
-                else:
-                    excluded.update(by_index[line["set"]])
+        for tests, ok in _check_sets(run, pending).items():
+            if ok:
+                passed.add(tests)
+            else:
+                excluded.update(tests)
     if covering and all(set(tests) <= excluded for tests in covering.values()):
         raise AgentError("every covering test failed the baseline checkpoint")
-    (run_dir / "excluded.json").write_text(json.dumps(sorted(excluded)), encoding="utf-8")
+    (run.dir / "excluded.json").write_text(json.dumps(sorted(excluded)), encoding="utf-8")
     return excluded
 
 
-def _run_agent(plan: dict, run_dir: Path, agent: Agent, generation: int | None) -> None:
+def _run_mutant(run: _Run, mutant_id: int, tests: list[str], attempt: int) -> tuple[str, int]:
+    """Run one mutant and return its status and attempt; a generation change while its line is pending re-runs it once as attempt 2."""
+    path = run.dir / "results.jsonl"
+    while True:
+        run.before_call()
+        offset, sent = _size(path), time.monotonic()
+        try:
+            _check(f"RunMutant {mutant_id}", run.agent.run_mutant(run.id, mutant_id, tests, attempt))
+        except EvalOutcomeUnknown:
+            try:
+                found = _wait_for_line(run, path, offset, lambda r: r.get("mutantId") == mutant_id, sent)
+            except GenerationChanged:
+                if attempt == 2:
+                    raise GameUnresponsive(f"RunMutant {mutant_id}: the context generation changed again while a line was pending; {_resume_hint(run.id)}") from None
+                run.arm()
+                attempt = 2
+                continue
+            if not found:
+                _append_timeout(path, mutant_id, attempt)
+                raise GameUnresponsive(
+                    f"RunMutant {mutant_id}: no line after the eval deadline (game hung or batch failed); {_resume_hint(run.id)}") from None
+        lines = [r for r in read_jsonl(path, offset) if r.get("mutantId") == mutant_id]
+        if not lines:
+            raise AgentError(f"RunMutant {mutant_id}: no result line")
+        return lines[-1]["status"], attempt
+
+
+def _run_mutants(run: _Run, covering: dict[int, list[str]]) -> None:
+    """Run each covered mutant; after each file, checkpoint the sets used since the last pass and recover on failure."""
+    by_file: dict[int, list[int]] = {}
+    for m in run.plan["mutants"]:
+        if covering.get(m["id"]):
+            by_file.setdefault(m["file"], []).append(m["id"])
+    for ids in by_file.values():
+        killed = []
+        for mutant_id in ids:
+            tests = covering[mutant_id]
+            status, attempt = _run_mutant(run, mutant_id, tests, 1)
+            if status == "RuntimeError" and attempt == 1 and not _check_sets(run, [tuple(tests)])[tuple(tests)]:
+                run.recover()
+                _run_mutant(run, mutant_id, tests, 2)
+                for killed_id in killed:
+                    _run_mutant(run, killed_id, covering[killed_id], 2)
+                killed = []
+            elif status == "Killed" and attempt == 1:
+                killed.append(mutant_id)
+        sets = list(dict.fromkeys(tuple(covering[i]) for i in ids))
+        if not all(_check_sets(run, sets).values()):
+            run.recover()
+            for mutant_id in killed:
+                _run_mutant(run, mutant_id, covering[mutant_id], 2)
+
+
+def _run_agent(run: _Run) -> None:
     """Dry run, append the host-classified results, then run each covered mutant."""
-    run_id = plan["runId"]
-    test_ids = json.loads((run_dir / "tests.json").read_text(encoding="utf-8"))
+    plan = run.plan
+    test_ids = json.loads((run.dir / "tests.json").read_text(encoding="utf-8"))
     if not test_ids:
         raise AgentError(f"no tests match the test filter {json.dumps(plan['testFilter'])}")
-    coverage = _dry_run(run_id, run_dir, agent, test_ids, generation)
+    coverage = _dry_run(run, test_ids)
     covering = {m["id"]: [c["test"] for c in coverage if m["id"] in (c["hits"] or [])] for m in plan["mutants"]
                 if "ignoredReason" not in m}
-    excluded = _checkpoint(run_id, run_dir, agent, {i: t for i, t in covering.items() if t}, generation)
-    with open(run_dir / "results.jsonl", "a", encoding="utf-8") as f:
+    excluded = _checkpoint(run, {i: t for i, t in covering.items() if t})
+    with open(run.dir / "results.jsonl", "a", encoding="utf-8") as f:
         for m in plan["mutants"]:
             if "ignoredReason" in m:
                 f.write(json.dumps(_host_result(m["id"], "Ignored", m["ignoredReason"])) + "\n")
@@ -291,19 +412,7 @@ def _run_agent(plan: dict, run_dir: Path, agent: Agent, generation: int | None) 
                 f.write(json.dumps(_host_result(m["id"], "NoCoverage")) + "\n")
             elif all(t in excluded for t in covering[m["id"]]):
                 f.write(json.dumps(_host_result(m["id"], "Ignored", "order-dependent tests")) + "\n")
-    covering = {i: [t for t in tests if t not in excluded] for i, tests in covering.items()}
-    for m in plan["mutants"]:
-        if covering.get(m["id"]):
-            _check_generation(agent, generation, run_id)
-            sent = time.monotonic()
-            try:
-                _check(f"RunMutant {m['id']}", agent.run_mutant(run_id, m["id"], covering[m["id"]]))
-            except EvalOutcomeUnknown:
-                path = run_dir / "results.jsonl"
-                if not _wait_for_line(path, lambda r: r.get("mutantId") == m["id"], sent, agent, generation, run_id):
-                    _append_timeout(path, m["id"])
-                    raise GameUnresponsive(
-                        f"RunMutant {m['id']}: no line after the eval deadline (game hung or batch failed); {_resume_hint(run_id)}") from None
+    _run_mutants(run, {i: [t for t in tests if t not in excluded] for i, tests in covering.items()})
 
 
 def run_plan(plan: dict, chunks: dict[str, str], root: Path, agent: Agent) -> dict[int, dict]:
@@ -317,7 +426,7 @@ def run_plan(plan: dict, chunks: dict[str, str], root: Path, agent: Agent) -> di
 
     _check("Prepare", agent.prepare(run_id))
     try:
-        _run_agent(plan, run_dir, agent, agent.generation())
+        _run_agent(_Run(plan, run_dir, agent, agent.generation()))
     except GameUnresponsive:
         raise  # the game may be hung; resume calls Restore, then Prepare
     except AgentError as e:

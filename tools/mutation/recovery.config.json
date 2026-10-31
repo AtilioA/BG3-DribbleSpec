@@ -1,0 +1,8 @@
+{
+  "modTable": "Dribbles",
+  "modDirectory": "DribbleSpec",
+  "ownerModuleUUID": "95d8af72-eff9-40dc-9f9f-02effe3114fc",
+  "luaRoot": "../../DribbleSpec/Mods/DribbleSpec/ScriptExtender/Lua",
+  "files": ["Shared/DribbleSpec/Tests/Mutation/Dirty*Fixture.lua"],
+  "testFilter": { "name": "DribbleSpec Mutation recovery fixture" }
+}

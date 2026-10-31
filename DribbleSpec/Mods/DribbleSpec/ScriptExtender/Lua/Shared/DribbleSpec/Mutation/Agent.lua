@@ -153,11 +153,24 @@ function Agent.Create(deps)
     end
 
     local function restore()
+        Runtime.a = 0
         for i = #(originals or {}), 1, -1 do
             local o = originals[i]
             o.parent[o.key] = o.fn
         end
         originals = nil
+    end
+
+    --- After a reset the agent is fresh, so the steps come from the run's earlier dry runs.
+    ---@param runId string
+    local function loadDryRunSteps(runId)
+        dryRunSteps = {}
+        for line in (Ext.IO.LoadFile(runPath(runId, "coverage.jsonl")) or ""):gmatch("[^\n]+") do
+            local ok, c = pcall(Ext.Json.Parse, line)
+            if ok then
+                dryRunSteps[c.test] = c.status == "passed" and c.steps or nil
+            end
+        end
     end
 
     ---@param runId string
@@ -209,6 +222,7 @@ function Agent.Create(deps)
                     error("patch install failed: " .. tostring(err), 0)
                 end
             end
+            loadDryRunSteps(runId)
             plan = p
         end)
     end
@@ -299,13 +313,14 @@ function Agent.Create(deps)
     ---@param runId string
     ---@param mutantId integer
     ---@param testIds string[]
+    ---@param attempt integer 2 when the host re-runs the mutant after a recovery
     ---@return string
-    function agent.RunMutant(runId, mutantId, testIds)
+    function agent.RunMutant(runId, mutantId, testIds, attempt)
         return guarded(function()
             if plan == nil then
                 error("no prepared run; call Prepare first", 0)
             end
-            local result = { mutantId = mutantId, killedBy = {}, passed = 0, failed = 0, skipped = 0, attempt = 1 }
+            local result = { mutantId = mutantId, killedBy = {}, passed = 0, failed = 0, skipped = 0, attempt = attempt }
             local covered = 0
             for _, id in ipairs(testIds) do
                 covered = covered + (dryRunSteps[id] or 0)

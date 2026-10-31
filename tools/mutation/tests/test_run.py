@@ -34,6 +34,9 @@ class FakeAgent:
         self.skipped = {}  # test -> skip reason
         self.fails_together = set()  # a checkpoint set containing all of these fails them all
         self.checkpoint_sets = []
+        self.killed = {2}
+        self.pollutes = set()  # a mutant here leaves shared state dirty until a reset
+        self.dirty = False  # every checkpoint set fails and every mutant is Killed
 
     def _append(self, name, record):
         with open(self.dir / name, "a", encoding="utf-8") as f:
@@ -62,18 +65,30 @@ class FakeAgent:
         self.calls.append(f"Checkpoint {sets}")
         self.checkpoint_sets += [tests for _, tests in sets]
         for index, tests in sets:
-            failed = tests if self.fails_together and self.fails_together <= set(tests) else []
+            failed = tests if self.dirty or self.fails_together and self.fails_together <= set(tests) else []
             self._append("checkpoint.jsonl", {"set": index, "status": "failed" if failed else "passed",
                                               "failed": failed, "durationMs": self.duration_ms})
         return "ok"
 
-    def run_mutant(self, run_id, mutant_id, test_ids):
-        self.calls.append(f"RunMutant {mutant_id} {test_ids}")
-        killed = mutant_id == 2
-        self._append("results.jsonl", {"mutantId": mutant_id, "status": "Killed" if killed else "Survived",
+    def run_mutant(self, run_id, mutant_id, test_ids, attempt):
+        self.calls.append(f"RunMutant {mutant_id} {test_ids}" + (f" attempt {attempt}" if attempt != 1 else ""))
+        status = self.status_of(mutant_id, attempt)
+        killed = status == "Killed"
+        if mutant_id in self.pollutes:
+            self.dirty = True
+        self._append("results.jsonl", {"mutantId": mutant_id, "status": status,
                                        "killedBy": ["t"] if killed else [], "passed": 0 if killed else 1,
-                                       "failed": 1 if killed else 0, "skipped": 0, "durationMs": 1, "attempt": 1})
+                                       "failed": 1 if killed else 0, "skipped": 0, "durationMs": 1,
+                                       "attempt": attempt})
         return "ok"
+
+    def status_of(self, mutant_id, attempt):
+        return "Killed" if mutant_id in self.killed or self.dirty else "Survived"
+
+    def reset(self):
+        self.calls.append("Reset")
+        self.dirty = False
+        self.gen += 1
 
     def restore(self, run_id):
         self.calls.append("Restore")
@@ -87,7 +102,7 @@ def test_run_classifies_each_mutant_and_restores(tmp_path):
     assert {i: r["status"] for i, r in results.items()} == {1: "Survived", 2: "Killed", 3: "NoCoverage", 4: "Ignored"}
     assert results[2]["killedBy"] == ["t"]
     assert agent.calls == ["Prepare", "DryRun ['t']", "DryRun ['u']", "Checkpoint [(1, ('t',))]", "RunMutant 1 ['t']",
-                           "RunMutant 2 ['t']", "Restore"]
+                           "RunMutant 2 ['t']", "Checkpoint [(2, ('t',))]", "Restore"]
     assert (tmp_path / "DribbleSpecMutation/r1/1.lua").read_text() == "chunk"
     assert json.loads((tmp_path / "DribbleSpecMutation/r1/plan.json").read_text())["runId"] == "r1"
 
@@ -149,8 +164,8 @@ def test_a_restore_eval_failure_keeps_the_original_error(tmp_path):
 
 def test_last_result_line_wins_and_a_truncated_last_line_is_ignored(tmp_path):
     class Rerun(FakeAgent):
-        def run_mutant(self, run_id, mutant_id, test_ids):
-            super().run_mutant(run_id, mutant_id, test_ids)
+        def run_mutant(self, run_id, mutant_id, test_ids, attempt):
+            super().run_mutant(run_id, mutant_id, test_ids, attempt)
             if mutant_id == 2:
                 self._append("results.jsonl", {"mutantId": 1, "status": "Killed", "killedBy": ["t"], "attempt": 2})
                 with open(self.dir / "results.jsonl", "a") as f:
@@ -195,9 +210,9 @@ class LateLine(FakeAgent):
         self.pending = "u"
         raise EvalOutcomeUnknown("DryRun eval outcome unknown: backend_attach_timeout")
 
-    def run_mutant(self, run_id, mutant_id, test_ids):
-        if mutant_id != 1 or self.late_dry_run:
-            return super().run_mutant(run_id, mutant_id, test_ids)
+    def run_mutant(self, run_id, mutant_id, test_ids, attempt):
+        if mutant_id != 1 or attempt != 1 or self.late_dry_run:
+            return super().run_mutant(run_id, mutant_id, test_ids, attempt)
         self.calls.append(f"RunMutant 1 {test_ids}")
         if self.truncate:
             with open(self.dir / "results.jsonl", "a") as f:
@@ -216,7 +231,7 @@ def test_a_late_line_after_a_missed_deadline_keeps_the_agent_status(tmp_path, no
     results = run_plan(PLAN, {}, tmp_path, agent)
 
     assert results[1]["status"] == "Killed"
-    assert agent.calls[-4:] == ["RunMutant 1 ['t']", "line 1", "RunMutant 2 ['t']", "Restore"]
+    assert agent.calls[-5:] == ["RunMutant 1 ['t']", "line 1", "RunMutant 2 ['t']", "Checkpoint [(2, ('t',))]", "Restore"]
 
 
 def test_a_late_coverage_line_after_a_missed_dry_run_deadline_continues_the_run(tmp_path, no_sleep):
@@ -264,23 +279,176 @@ def test_a_corrupt_middle_line_is_a_clear_error(tmp_path):
         run.read_jsonl(path)
 
 
-def test_a_generation_change_while_a_line_is_pending_stops_the_run(tmp_path, no_sleep):
+def test_a_generation_change_while_a_line_is_pending_rearms_and_reruns_the_mutant(tmp_path, no_sleep):
     agent = LateLine(tmp_path, line_at=None, gen_change_at=3)
-    with pytest.raises(AgentError, match="context generation changed.*resume"):
-        run_plan(PLAN, {}, tmp_path, agent)
-    assert "RunMutant 2 ['t']" not in agent.calls
+    results = run_plan(PLAN, {}, tmp_path, agent)
+    assert agent.calls[4:8] == ["RunMutant 1 ['t']", "Restore", "Prepare", "RunMutant 1 ['t'] attempt 2"]
+    assert (results[1]["status"], results[1]["attempt"]) == ("Survived", 2)
 
 
-def test_a_generation_change_before_a_call_stops_the_run(tmp_path):
+def test_a_generation_change_before_a_call_rearms_first(tmp_path):
     class Restarted(FakeAgent):
-        def run_mutant(self, run_id, mutant_id, test_ids):
-            self.gen = 2
-            return super().run_mutant(run_id, mutant_id, test_ids)
+        def run_mutant(self, run_id, mutant_id, test_ids, attempt):
+            if mutant_id == 1:
+                self.gen = 2
+            return super().run_mutant(run_id, mutant_id, test_ids, attempt)
 
     agent = Restarted(tmp_path)
-    with pytest.raises(AgentError, match="context generation changed"):
+    results = run_plan(PLAN, {}, tmp_path, agent)
+    assert agent.calls[4:8] == ["RunMutant 1 ['t']", "Restore", "Prepare", "RunMutant 2 ['t']"]
+    assert results[2]["status"] == "Killed"
+
+
+def test_a_line_written_before_the_send_does_not_end_the_wait(tmp_path, no_sleep, monkeypatch):
+    class Stale(LateLine):
+        def dry_run(self, run_id, test_ids):
+            self._append("results.jsonl", {"mutantId": 1, "status": "Killed", "attempt": 1})
+            return super().dry_run(run_id, test_ids)
+
+    monkeypatch.setattr(run, "LATE_LINE_WAIT_S", 0)
+    with pytest.raises(run.GameUnresponsive):
+        run_plan(PLAN, {}, tmp_path, Stale(tmp_path, line_at=None))
+
+
+TWO_FILES = {**PLAN, "files": PLAN["files"] + [{"index": 2, "path": "G.lua", "patchPath": "DribbleSpecMutation/r1/2.lua"}],
+             "mutants": [{**m, "file": 1 if m["id"] <= 2 else 2} for m in PLAN["mutants"][:3]]
+             + [{"id": 4, "file": 2, "line": 12, "operator": "RelationalBoundary", "original": ">", "replacement": "<="}]}
+
+
+def two_file_agent(root):
+    agent = FakeAgent(root)
+    agent.coverage = {"t": [1, 2, 3, 4], "u": []}
+    agent.killed = {2, 4}
+    return agent
+
+
+def test_a_failing_file_checkpoint_resets_and_reruns_the_killed_mutants_since_the_last_pass(tmp_path):
+    agent = two_file_agent(tmp_path)
+    agent.pollutes = {2}
+    results = run_plan(TWO_FILES, {}, tmp_path, agent)
+
+    assert agent.calls[4:] == [
+        "RunMutant 1 ['t']", "RunMutant 2 ['t']", "Checkpoint [(2, ('t',))]",
+        "Reset", "Restore", "Prepare", "RunMutant 2 ['t'] attempt 2",
+        "RunMutant 3 ['t']", "RunMutant 4 ['t']", "Checkpoint [(3, ('t',))]",
+        "Reset", "Restore", "Prepare", "RunMutant 3 ['t'] attempt 2", "RunMutant 4 ['t'] attempt 2",
+        "Restore"]
+    assert {i: (r["status"], r["attempt"]) for i, r in results.items()} == {
+        1: ("Survived", 1), 2: ("Killed", 2), 3: ("Survived", 2), 4: ("Killed", 2)}
+
+
+def test_a_passing_file_checkpoint_reruns_nothing(tmp_path):
+    agent = two_file_agent(tmp_path)
+    run_plan(TWO_FILES, {}, tmp_path, agent)
+    assert "Reset" not in agent.calls
+    assert [c for c in agent.calls if c.startswith("Checkpoint")] == [
+        "Checkpoint [(1, ('t',))]", "Checkpoint [(2, ('t',))]", "Checkpoint [(3, ('t',))]"]
+
+
+class Errors(FakeAgent):
+    """Mutant 1 is a RuntimeError on the attempts in `errors` and leaves state dirty."""
+
+    def __init__(self, root, errors):
+        super().__init__(root)
+        self.errors = errors
+        self.pollutes = {1}
+
+    def status_of(self, mutant_id, attempt):
+        return "RuntimeError" if mutant_id == 1 and attempt in self.errors else super().status_of(mutant_id, attempt)
+
+
+def test_a_runtime_error_with_a_failing_checkpoint_reruns_the_mutant_once(tmp_path):
+    agent = Errors(tmp_path, errors={1})
+    results = run_plan(PLAN, {}, tmp_path, agent)
+
+    assert agent.calls[4:10] == ["RunMutant 1 ['t']", "Checkpoint [(2, ('t',))]", "Reset", "Restore", "Prepare",
+                                 "RunMutant 1 ['t'] attempt 2"]
+    assert (results[1]["status"], results[1]["attempt"]) == ("Survived", 2)
+
+
+def test_a_second_runtime_error_stays(tmp_path):
+    agent = Errors(tmp_path, errors={1, 2})
+    results = run_plan(PLAN, {}, tmp_path, agent)
+
+    assert agent.calls.count("RunMutant 1 ['t'] attempt 2") == 1
+    assert (results[1]["status"], results[1]["attempt"]) == ("RuntimeError", 2)
+
+
+def test_a_runtime_error_with_a_passing_checkpoint_keeps_its_status(tmp_path):
+    agent = Errors(tmp_path, errors={1})
+    agent.pollutes = set()
+    results = run_plan(PLAN, {}, tmp_path, agent)
+    assert agent.calls[4:6] == ["RunMutant 1 ['t']", "Checkpoint [(2, ('t',))]"]
+    assert "Reset" not in agent.calls
+    assert results[1]["status"] == "RuntimeError"
+
+
+def test_a_runtime_error_rerun_that_is_killed_is_not_rerun_by_the_file_checkpoint(tmp_path):
+    agent = Errors(tmp_path, errors={1})
+    agent.killed = {1, 2}  # attempt 2 is Killed and pollutes again, so the file checkpoint fails
+    run_plan(PLAN, {}, tmp_path, agent)
+    assert agent.calls.count("RunMutant 1 ['t'] attempt 2") == 1
+    assert agent.calls.count("RunMutant 2 ['t'] attempt 2") == 1
+
+
+def test_a_runtime_error_recovery_also_reruns_the_killed_mutants_before_it(tmp_path):
+    class LateError(FakeAgent):
+        def status_of(self, mutant_id, attempt):
+            return "RuntimeError" if mutant_id == 2 and attempt == 1 else super().status_of(mutant_id, attempt)
+
+    agent = LateError(tmp_path)
+    agent.killed = {1}
+    agent.pollutes = {2}
+    results = run_plan(PLAN, {}, tmp_path, agent)
+    assert agent.calls[4:] == ["RunMutant 1 ['t']", "RunMutant 2 ['t']", "Checkpoint [(2, ('t',))]", "Reset",
+                               "Restore", "Prepare", "RunMutant 2 ['t'] attempt 2", "RunMutant 1 ['t'] attempt 2",
+                               "Checkpoint [(3, ('t',))]", "Reset", "Restore", "Prepare", "Restore"]
+    assert (results[1]["status"], results[1]["attempt"]) == ("Killed", 2)
+
+
+class Reattach(FakeAgent):
+    """Mutant 1's first `changes` sends lose their outcome and raise the generation."""
+
+    def __init__(self, root, changes=1):
+        super().__init__(root)
+        self.changes = changes
+
+    def run_mutant(self, run_id, mutant_id, test_ids, attempt):
+        if mutant_id == 1 and self.changes:
+            self.changes -= 1
+            self.calls.append(f"RunMutant 1 {test_ids} lost")
+            self.gen += 1
+            raise EvalOutcomeUnknown("RunMutant eval outcome unknown")
+        return super().run_mutant(run_id, mutant_id, test_ids, attempt)
+
+
+@pytest.mark.parametrize("status", ["RuntimeError", "Killed"])
+def test_a_generation_change_rerun_is_the_last_attempt(tmp_path, no_sleep, status):
+    agent = Reattach(tmp_path)
+    agent.status_of = lambda mutant_id, attempt: status if mutant_id == 1 else "Killed"
+    agent.pollutes = {1}
+    run_plan(PLAN, {}, tmp_path, agent)
+    assert agent.calls.count("RunMutant 1 ['t'] attempt 2") == 1
+
+
+def test_a_second_generation_change_while_a_mutant_line_is_pending_stops_the_run(tmp_path, no_sleep):
+    agent = Reattach(tmp_path, changes=5)
+    with pytest.raises(run.GameUnresponsive, match="resume r1"):
         run_plan(PLAN, {}, tmp_path, agent)
-    assert agent.calls[-2:] == ["RunMutant 1 ['t']", "Restore"]
+    assert agent.calls.count("RunMutant 1 ['t'] lost") == 2
+
+
+def test_a_second_generation_change_while_a_batch_line_is_pending_stops_the_run(tmp_path, no_sleep):
+    class Lost(FakeAgent):
+        def dry_run(self, run_id, test_ids):
+            self.calls.append("DryRun lost")
+            self.gen += 1
+            raise EvalOutcomeUnknown("DryRun eval outcome unknown")
+
+    agent = Lost(tmp_path)
+    with pytest.raises(run.GameUnresponsive, match="resume r1"):
+        run_plan(PLAN, {}, tmp_path, agent)
+    assert agent.calls.count("DryRun lost") == 2
 
 
 def test_dry_run_batches_start_with_one_test_and_grow_from_measured_durations(tmp_path):
@@ -339,17 +507,18 @@ def test_a_failing_set_is_excluded_and_rebuilt_sets_are_checked_until_stable(tmp
     results = run_plan(PLAN, {}, tmp_path, agent)
 
     checkpoints = [c for c in agent.calls if c.startswith("Checkpoint")]
-    assert checkpoints == ["Checkpoint [(1, ('a', 'b'))]", "Checkpoint [(2, ('b', 'c'))]", "Checkpoint [(3, ('a',))]"]
+    assert checkpoints == ["Checkpoint [(1, ('a', 'b'))]", "Checkpoint [(2, ('b', 'c'))]", "Checkpoint [(3, ('a',))]",
+                           "Checkpoint [(4, ('a',))]"]
     assert [c for c in agent.calls if c.startswith("RunMutant")] == ["RunMutant 1 ['a']"]
     assert results[2]["status"] == "Ignored" and results[2]["message"] == "order-dependent tests"
     assert results[3]["status"] == "NoCoverage"
     assert json.loads((tmp_path / "DribbleSpecMutation/r1/excluded.json").read_text()) == ["b", "c"]
 
 
-def test_the_mutant_loop_starts_after_every_checkpoint(tmp_path):
+def test_the_mutant_loop_starts_after_every_baseline_checkpoint(tmp_path):
     agent = order_dependent_agent(tmp_path)
     run_plan(PLAN, {}, tmp_path, agent)
-    last_checkpoint = max(i for i, c in enumerate(agent.calls) if c.startswith("Checkpoint"))
+    last_checkpoint = max(i for i, c in enumerate(agent.calls) if c.startswith("Checkpoint [(3"))
     assert min(i for i, c in enumerate(agent.calls) if c.startswith("RunMutant")) > last_checkpoint
 
 
@@ -386,7 +555,7 @@ def test_a_set_that_passed_is_not_resent_after_other_sets_are_rebuilt(tmp_path):
     run_plan(PLAN, {}, tmp_path, agent)
     sent = agent.checkpoint_sets
     # Round 1 sends all three sets; after excluding b and c, the rebuilt sets equal the passed ('a',).
-    assert sent == [("a", "b"), ("b", "c"), ("a",)]
+    assert sent == [("a", "b"), ("b", "c"), ("a",), ("a",)]
 
 
 def test_a_broker_disconnect_is_a_clear_agent_error():

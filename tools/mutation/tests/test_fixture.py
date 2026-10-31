@@ -3,10 +3,16 @@ from pathlib import Path
 
 import pytest
 
-from dribblespec_mutate import fnv1a32
+from dribblespec_mutate import build_plan, fnv1a32, load_config
 from dribblespec_mutate.instrument import instrument
 
 FIXTURE_DIR = Path(__file__).parents[3] / "DribbleSpec/Mods/DribbleSpec/ScriptExtender/Lua/Shared/DribbleSpec/Tests/Mutation"
+
+
+def test_recovery_config_plans_a_polluting_mutant_and_two_victims():
+    plan, _ = build_plan(load_config(Path(__file__).parents[1] / "recovery.config.json"), "r")
+    live = [(m["file"], m["original"], m["replacement"]) for m in plan["mutants"] if "ignoredReason" not in m]
+    assert live == [(1, "false", "true"), (2, "*", "/"), (2, "+", "-")]
 
 
 @pytest.mark.parametrize("name, hash_name, first_id", [("Fixture", "FIXTURE_HASH", 1),
