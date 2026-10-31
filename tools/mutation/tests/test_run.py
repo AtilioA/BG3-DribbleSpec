@@ -31,6 +31,9 @@ class FakeAgent:
         self.coverage = {"t": [1, 2], "u": []}
         self.duration_ms = 1
         self.gen = 1
+        self.skipped = {}  # test -> skip reason
+        self.fails_together = set()  # a checkpoint set containing all of these fails them all
+        self.checkpoint_sets = []
 
     def _append(self, name, record):
         with open(self.dir / name, "a", encoding="utf-8") as f:
@@ -47,10 +50,22 @@ class FakeAgent:
     def dry_run(self, run_id, test_ids):
         self.calls.append(f"DryRun {test_ids}")
         for test in test_ids:
-            if test in self.coverage:
+            if test in self.skipped:
+                self._append("coverage.jsonl", {"test": test, "status": "skipped", "durationMs": self.duration_ms,
+                                                "steps": 0, "hits": [], "skipReason": self.skipped[test]})
+            elif test in self.coverage:
                 self._append("coverage.jsonl", {"test": test, "status": "passed", "durationMs": self.duration_ms,
                                                 "steps": 3, "hits": self.coverage[test]})
         return self.statuses["DryRun"]
+
+    def checkpoint(self, run_id, sets):
+        self.calls.append(f"Checkpoint {sets}")
+        self.checkpoint_sets += [tests for _, tests in sets]
+        for index, tests in sets:
+            failed = tests if self.fails_together and self.fails_together <= set(tests) else []
+            self._append("checkpoint.jsonl", {"set": index, "status": "failed" if failed else "passed",
+                                              "failed": failed, "durationMs": self.duration_ms})
+        return "ok"
 
     def run_mutant(self, run_id, mutant_id, test_ids):
         self.calls.append(f"RunMutant {mutant_id} {test_ids}")
@@ -71,8 +86,8 @@ def test_run_classifies_each_mutant_and_restores(tmp_path):
 
     assert {i: r["status"] for i, r in results.items()} == {1: "Survived", 2: "Killed", 3: "NoCoverage", 4: "Ignored"}
     assert results[2]["killedBy"] == ["t"]
-    assert agent.calls == ["Prepare", "DryRun ['t']", "DryRun ['u']", "RunMutant 1 ['t']", "RunMutant 2 ['t']",
-                           "Restore"]
+    assert agent.calls == ["Prepare", "DryRun ['t']", "DryRun ['u']", "Checkpoint [(1, ('t',))]", "RunMutant 1 ['t']",
+                           "RunMutant 2 ['t']", "Restore"]
     assert (tmp_path / "DribbleSpecMutation/r1/1.lua").read_text() == "chunk"
     assert json.loads((tmp_path / "DribbleSpecMutation/r1/plan.json").read_text())["runId"] == "r1"
 
@@ -207,7 +222,8 @@ def test_a_late_line_after_a_missed_deadline_keeps_the_agent_status(tmp_path, no
 def test_a_late_coverage_line_after_a_missed_dry_run_deadline_continues_the_run(tmp_path, no_sleep):
     agent = LateLine(tmp_path, late_dry_run=True)
     run_plan(PLAN, {}, tmp_path, agent)
-    assert agent.calls[:5] == ["Prepare", "DryRun ['t']", "DryRun ['u']", "line u", "RunMutant 1 ['t']"]
+    assert agent.calls[:6] == ["Prepare", "DryRun ['t']", "DryRun ['u']", "line u", "Checkpoint [(1, ('t',))]",
+                              "RunMutant 1 ['t']"]
 
 
 def test_no_line_past_the_wait_bound_records_timeout_and_stops_without_restore(tmp_path, no_sleep, monkeypatch):
@@ -307,6 +323,70 @@ def test_no_passed_test_after_the_last_batch_stops_the_run(tmp_path):
     with pytest.raises(AgentError, match="no test left after dropping skipped tests"):
         run_plan(PLAN, {}, tmp_path, agent)
     assert agent.calls == ["Prepare", "DryRun ['t']", "DryRun ['u']", "Restore"]
+
+
+def order_dependent_agent(root):
+    """`b` and `c` fail when run together: mutant 1 is covered by [a, b], mutant 2 by [b, c]."""
+    agent = FakeAgent(root)
+    agent.tests = ["a", "b", "c"]
+    agent.coverage = {"a": [1], "b": [1, 2], "c": [2]}
+    agent.fails_together = {"b", "c"}
+    return agent
+
+
+def test_a_failing_set_is_excluded_and_rebuilt_sets_are_checked_until_stable(tmp_path):
+    agent = order_dependent_agent(tmp_path)
+    results = run_plan(PLAN, {}, tmp_path, agent)
+
+    checkpoints = [c for c in agent.calls if c.startswith("Checkpoint")]
+    assert checkpoints == ["Checkpoint [(1, ('a', 'b'))]", "Checkpoint [(2, ('b', 'c'))]", "Checkpoint [(3, ('a',))]"]
+    assert [c for c in agent.calls if c.startswith("RunMutant")] == ["RunMutant 1 ['a']"]
+    assert results[2]["status"] == "Ignored" and results[2]["message"] == "order-dependent tests"
+    assert results[3]["status"] == "NoCoverage"
+    assert json.loads((tmp_path / "DribbleSpecMutation/r1/excluded.json").read_text()) == ["b", "c"]
+
+
+def test_the_mutant_loop_starts_after_every_checkpoint(tmp_path):
+    agent = order_dependent_agent(tmp_path)
+    run_plan(PLAN, {}, tmp_path, agent)
+    last_checkpoint = max(i for i, c in enumerate(agent.calls) if c.startswith("Checkpoint"))
+    assert min(i for i, c in enumerate(agent.calls) if c.startswith("RunMutant")) > last_checkpoint
+
+
+def test_excluding_every_covering_test_stops_the_run(tmp_path):
+    agent = FakeAgent(tmp_path)
+    agent.fails_together = {"t"}
+    with pytest.raises(AgentError, match="every covering test failed the baseline checkpoint"):
+        run_plan(PLAN, {}, tmp_path, agent)
+    assert agent.calls[-1] == "Restore"
+
+
+def test_skipped_tests_are_dropped_and_counted_per_reason(tmp_path, capsys):
+    agent = FakeAgent(tmp_path)
+    agent.tests = ["t", "s1", "s2", "s3"]
+    agent.skipped = {"s1": "no party", "s2": "no party", "s3": "caf\u00e9"}
+    run_plan(PLAN, {}, tmp_path, agent)
+
+    out = capsys.readouterr().out.splitlines()
+    assert out[:3] == ["Skipped at baseline: 3", "  2 no party", "  1 caf\\xe9"]
+    assert "Checkpoint [(1, ('t',))]" in agent.calls
+
+
+def test_every_test_skipped_at_dry_run_stops_before_any_checkpoint(tmp_path):
+    agent = FakeAgent(tmp_path)
+    agent.skipped = {"t": "no party", "u": "no party"}
+    with pytest.raises(AgentError, match="no test left after dropping skipped tests"):
+        run_plan(PLAN, {}, tmp_path, agent)
+    assert not any(c.startswith("Checkpoint") for c in agent.calls)
+
+
+def test_a_set_that_passed_is_not_resent_after_other_sets_are_rebuilt(tmp_path):
+    agent = order_dependent_agent(tmp_path)
+    agent.coverage = {"a": [1, 3], "b": [1, 2], "c": [2]}
+    run_plan(PLAN, {}, tmp_path, agent)
+    sent = agent.checkpoint_sets
+    # Round 1 sends all three sets; after excluding b and c, the rebuilt sets equal the passed ('a',).
+    assert sent == [("a", "b"), ("b", "c"), ("a",)]
 
 
 def test_a_broker_disconnect_is_a_clear_agent_error():

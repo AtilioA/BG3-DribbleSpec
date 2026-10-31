@@ -4,6 +4,7 @@ import asyncio
 import json
 import os
 import time
+from collections import Counter
 from pathlib import Path
 from typing import Callable, Protocol
 
@@ -38,6 +39,7 @@ class Agent(Protocol):
     def generation(self) -> int | None: ...
     def prepare(self, run_id: str) -> str: ...
     def dry_run(self, run_id: str, test_ids: list[str]) -> str: ...
+    def checkpoint(self, run_id: str, sets: list[tuple[int, tuple[str, ...]]]) -> str: ...
     def run_mutant(self, run_id: str, mutant_id: int, test_ids: list[str]) -> str: ...
     def restore(self, run_id: str) -> str: ...
 
@@ -57,6 +59,10 @@ def lua_str(value: str) -> str:
 
 def lua_list(values: list[str]) -> str:
     return "{" + ", ".join(lua_str(v) for v in values) + "}"
+
+
+def lua_set(index: int, tests: tuple[str, ...]) -> str:
+    return f"{{ set = {index}, tests = {lua_list(list(tests))} }}"
 
 
 def decode_result(result: str) -> str:
@@ -117,6 +123,9 @@ class ConsoleAgent:
 
     def dry_run(self, run_id: str, test_ids: list[str]) -> str:
         return self._call("DryRun", f"{lua_str(run_id)}, {lua_list(test_ids)}")
+
+    def checkpoint(self, run_id: str, sets: list[tuple[int, tuple[str, ...]]]) -> str:
+        return self._call("Checkpoint", f"{lua_str(run_id)}, {{{', '.join(lua_set(i, t) for i, t in sets)}}}")
 
     def run_mutant(self, run_id: str, mutant_id: int, test_ids: list[str]) -> str:
         return self._call("RunMutant", f"{lua_str(run_id)}, {mutant_id}, {lua_list(test_ids)}")
@@ -187,36 +196,81 @@ def _append_timeout(path: Path, mutant_id: int) -> None:
                 .encode("utf-8"))
 
 
-def _dry_run(run_id: str, run_dir: Path, agent: Agent, test_ids: list[str], generation: int | None) -> list[dict]:
-    """Send DryRun in batches: one test first, then as many as fit the measured mean duration and the console limit."""
-    path = run_dir / "coverage.jsonl"
+def _send_batched(name: str, items: list, item_text: Callable[[object], str], send: Callable[[list], str],
+                  path: Path, is_last: Callable[[dict, object], bool], run_id: str, agent: Agent,
+                  generation: int | None) -> None:
+    """Send `items` in batches: one first, then as many as fit the measured mean duration and the console limit."""
     start = 0
     size = 1
-    while start < len(test_ids):
-        batch = [test_ids[start]]
-        length = CALL_OVERHEAD + len(lua_str(test_ids[start]))
-        while len(batch) < size and start + len(batch) < len(test_ids):
-            item = len(lua_str(test_ids[start + len(batch)])) + 2  # ", " separator
+    while start < len(items):
+        batch = [items[start]]
+        length = CALL_OVERHEAD + len(item_text(items[start]))
+        while len(batch) < size and start + len(batch) < len(items):
+            item = len(item_text(items[start + len(batch)])) + 2  # ", " separator
             if length + item > MAX_EXPRESSION:
                 break
             length += item
-            batch.append(test_ids[start + len(batch)])
+            batch.append(items[start + len(batch)])
         _check_generation(agent, generation, run_id)
         sent = time.monotonic()
         try:
-            _check("DryRun", agent.dry_run(run_id, batch))
+            _check(name, send(batch))
         except EvalOutcomeUnknown:
             last = batch[-1]
-            if not _wait_for_line(path, lambda c: c["test"] == last, sent, agent, generation, run_id):
-                raise GameUnresponsive(f"DryRun: no line after the eval deadline (game hung or batch failed); {_resume_hint(run_id)}")
+            if not _wait_for_line(path, lambda r: is_last(r, last), sent, agent, generation, run_id):
+                raise GameUnresponsive(f"{name}: no line after the eval deadline (game hung or batch failed); {_resume_hint(run_id)}")
         start += len(batch)
-        durations = [c["durationMs"] for c in read_jsonl(path)]
+        durations = [r["durationMs"] for r in read_jsonl(path)]
         if durations:
             size = max(1, int(DRY_RUN_BATCH_MS // max(sum(durations) / len(durations), 1)))
+
+
+def _dry_run(run_id: str, run_dir: Path, agent: Agent, test_ids: list[str], generation: int | None) -> list[dict]:
+    """Dry run every test, print the skipped count per reason, and return the passed tests' coverage."""
+    path = run_dir / "coverage.jsonl"
+    _send_batched("DryRun", test_ids, lua_str, lambda batch: agent.dry_run(run_id, batch), path,
+                  lambda c, last: c["test"] == last, run_id, agent, generation)
     coverage = read_jsonl(path)
-    if not any(c["status"] == "passed" for c in coverage):
+    skipped = Counter(c["skipReason"] for c in coverage if c["status"] == "skipped")
+    if skipped:
+        print(f"Skipped at baseline: {skipped.total()}")
+        for reason, count in skipped.most_common():
+            print(f"  {count} {reason.encode('ascii', 'backslashreplace').decode()}")
+    passed = [c for c in coverage if c["status"] == "passed"]
+    if not passed:
         raise AgentError("DryRun: no test left after dropping skipped tests")
-    return coverage
+    return passed
+
+
+def _checkpoint(run_id: str, run_dir: Path, agent: Agent, covering: dict[int, list[str]],
+                generation: int | None) -> set[str]:
+    """Run each distinct covering set with no mutant; exclude every test of a failing set until all sets pass."""
+    path = run_dir / "checkpoint.jsonl"
+    excluded: set[str] = set()
+    passed: set[tuple[str, ...]] = set()
+    index = 0
+    while True:
+        pending = list(dict.fromkeys(tuple(t for t in tests if t not in excluded) for tests in covering.values()))
+        pending = [s for s in pending if s and s not in passed]
+        if not pending:
+            break
+        sets = []
+        for tests in pending:
+            index += 1
+            sets.append((index, tests))
+        by_index = dict(sets)
+        _send_batched("Checkpoint", sets, lambda s: lua_set(*s), lambda batch: agent.checkpoint(run_id, batch), path,
+                      lambda r, last: r["set"] == last[0], run_id, agent, generation)
+        for line in read_jsonl(path):
+            if line["set"] in by_index:
+                if line["status"] == "passed":
+                    passed.add(by_index[line["set"]])
+                else:
+                    excluded.update(by_index[line["set"]])
+    if covering and all(set(tests) <= excluded for tests in covering.values()):
+        raise AgentError("every covering test failed the baseline checkpoint")
+    (run_dir / "excluded.json").write_text(json.dumps(sorted(excluded)), encoding="utf-8")
+    return excluded
 
 
 def _run_agent(plan: dict, run_dir: Path, agent: Agent, generation: int | None) -> None:
@@ -226,15 +280,20 @@ def _run_agent(plan: dict, run_dir: Path, agent: Agent, generation: int | None) 
     if not test_ids:
         raise AgentError(f"no tests match the test filter {json.dumps(plan['testFilter'])}")
     coverage = _dry_run(run_id, run_dir, agent, test_ids, generation)
-    covering = {m["id"]: [c["test"] for c in coverage if m["id"] in (c["hits"] or [])] for m in plan["mutants"]}
+    covering = {m["id"]: [c["test"] for c in coverage if m["id"] in (c["hits"] or [])] for m in plan["mutants"]
+                if "ignoredReason" not in m}
+    excluded = _checkpoint(run_id, run_dir, agent, {i: t for i, t in covering.items() if t}, generation)
     with open(run_dir / "results.jsonl", "a", encoding="utf-8") as f:
         for m in plan["mutants"]:
             if "ignoredReason" in m:
                 f.write(json.dumps(_host_result(m["id"], "Ignored", m["ignoredReason"])) + "\n")
             elif not covering[m["id"]]:
                 f.write(json.dumps(_host_result(m["id"], "NoCoverage")) + "\n")
+            elif all(t in excluded for t in covering[m["id"]]):
+                f.write(json.dumps(_host_result(m["id"], "Ignored", "order-dependent tests")) + "\n")
+    covering = {i: [t for t in tests if t not in excluded] for i, tests in covering.items()}
     for m in plan["mutants"]:
-        if "ignoredReason" not in m and covering[m["id"]]:
+        if covering.get(m["id"]):
             _check_generation(agent, generation, run_id)
             sent = time.monotonic()
             try:

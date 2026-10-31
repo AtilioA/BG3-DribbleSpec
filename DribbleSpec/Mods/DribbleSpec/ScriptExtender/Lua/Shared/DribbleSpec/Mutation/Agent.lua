@@ -75,6 +75,7 @@ local function resolveTarget(env, target)
     return parent, key
 end
 
+--- Duplicates are checked over every test of the owner, since `testIds` can select any of them.
 ---@param registry DribbleSpecRegistry
 ---@param plan table
 ---@return string[]
@@ -85,15 +86,18 @@ local function resolveTests(registry, plan)
         namePattern = testFilter.name,
         ownerModuleUUID = plan.ownerModuleUUID,
     })
+    local owned = Filter.Create({ ownerModuleUUID = plan.ownerModuleUUID })
     local ids, seen = {}, {}
     local function walk(suite, lineage)
         table.insert(lineage, suite)
         for _, test in ipairs(suite.tests) do
-            if filter.ShouldIncludeTest(lineage, test) then
+            if owned.ShouldIncludeTest(lineage, test) then
                 if seen[test.fullName] then
                     error("duplicate test full name: " .. test.fullName, 0)
                 end
                 seen[test.fullName] = true
+            end
+            if filter.ShouldIncludeTest(lineage, test) then
                 table.insert(ids, test.fullName)
             end
         end
@@ -223,17 +227,18 @@ function Agent.Create(deps)
                     Runtime.hits, Runtime.steps = {}, 0
                     local started = clock()
                     local run = deps.run(runOptions({ id }))
-                    local result
+                    local result, failed
                     eachResult(run.suites, function(test)
                         if test.fullName == id then result = test end
+                        if test.status == "failed" then failed = failed or test.fullName end
                     end)
+                    if failed ~= nil then
+                        error("test failed in dry run: " .. failed .. (failed ~= id and " (selected: " .. id .. ")" or ""), 0)
+                    end
                     if result == nil then
                         error("test not run: " .. id, 0)
                     end
                     local status = result.status
-                    if status == "failed" or (run.summary.failed or 0) > 0 then
-                        error("test failed in dry run: " .. id, 0)
-                    end
                     -- Skipped tests also get a line, so the host can see every id of a batch finish.
                     local hits = {}
                     if status == "passed" then
@@ -249,12 +254,44 @@ function Agent.Create(deps)
                         durationMs = clock() - started,
                         steps = Runtime.steps,
                         hits = hits,
+                        skipReason = status == "skipped" and (result.skipReason or "skipped") or nil,
                     })
                 end
             end, function(e) return tostring(e) end)
             Runtime.hits, Runtime.steps = nil, 0
             if not ok then
                 error(err, 0)
+            end
+        end)
+    end
+
+    --- Runs each set as one run with no active mutant; a set fails when any of its tests does not pass.
+    ---@param runId string
+    ---@param sets { set: integer, tests: string[] }[]
+    ---@return string
+    function agent.Checkpoint(runId, sets)
+        return guarded(function()
+            if plan == nil then
+                error("no prepared run; call Prepare first", 0)
+            end
+            Runtime.a = 0
+            for _, set in ipairs(sets) do
+                local started = clock()
+                local run = deps.run(runOptions(set.tests))
+                local failed, passed = {}, 0
+                eachResult(run.suites, function(test)
+                    if test.status == "passed" then
+                        passed = passed + 1
+                    else
+                        table.insert(failed, test.fullName)
+                    end
+                end)
+                appendLine(runPath(runId, "checkpoint.jsonl"), {
+                    set = set.set,
+                    status = (#failed == 0 and passed == #set.tests) and "passed" or "failed",
+                    failed = failed,
+                    durationMs = clock() - started,
+                })
             end
         end)
     end

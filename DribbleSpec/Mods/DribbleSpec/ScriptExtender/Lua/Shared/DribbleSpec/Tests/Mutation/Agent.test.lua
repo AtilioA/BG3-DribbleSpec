@@ -29,7 +29,8 @@ local SKIPPED = "Fixture other is skipped"
 local LOOP_ENDS, LOOP_FOREVER = 6, 7
 
 ---@param sourceHash string
-local function writePlan(sourceHash)
+---@param extraFiles table[]|nil plan file entries appended after the fixtures
+local function writePlan(sourceHash, extraFiles)
     Ext.IO.SaveFile(PATCH, Ext.IO.LoadFile(FIXTURE_DIR .. "Fixture.patch.txt", "data"))
     Ext.IO.SaveFile(LOOP_PATCH, Ext.IO.LoadFile(FIXTURE_DIR .. "LoopFixture.patch.txt", "data"))
     Ext.IO.SaveFile(DIR .. "coverage.jsonl", "")
@@ -53,14 +54,15 @@ local function writePlan(sourceHash)
             sourceHash = LOOP_FIXTURE_HASH,
             patchPath = LOOP_PATCH,
             targets = { "MutationLoopFixture.Approach" },
-        } },
+        }, table.unpack(extraFiles or {}) },
         mutants = {},
     }))
 end
 
 ---@param clock (fun(): number)|nil
+---@param extra (fun(registry: DribbleSpecRegistry))|nil adds root suites outside the "Fixture " filter
 ---@return MutationAgent
-local function createAgent(clock)
+local function createAgent(clock, extra)
     local registry = Registry.Create()
     registry:BeginSuite("Fixture")
     registry:BeginSuite("IsAtLeast")
@@ -97,6 +99,9 @@ local function createAgent(clock)
     end)
     registry:EndSuite()
     registry:EndSuite()
+    if extra then
+        extra(registry)
+    end
     return Agent.Create({
         registry = registry,
         clock = clock,
@@ -154,6 +159,7 @@ DribbleSpec.describe("DribbleSpec Mutation agent", { tags = { "mutation" } }, fu
         Assertions.Equals(#lines, 1, "coverage lines")
         Assertions.Equals(lines[1].test, SKIPPED, "test")
         Assertions.Equals(lines[1].status, "skipped", "status")
+        Assertions.Equals(lines[1].skipReason, "always", "skipReason")
         Assertions.Equals(#lines[1].hits, 0, "hits")
     end)
 
@@ -275,6 +281,93 @@ DribbleSpec.describe("DribbleSpec Mutation agent", { tags = { "mutation" } }, fu
         local ok, value = pcall(MutationLoopFixture.Approach, 0, 5)
         agent.Runtime.stepLimit = stepLimit
         Assertions.Equals(ok and value, 5, "Approach(0, 5) with no active mutant")
+    end)
+
+    DribbleSpec.test("duplicate full names anywhere in the owner's registry stop Prepare", function()
+        agent = createAgent(nil, function(registry)
+            registry:BeginSuite("Extra")
+            registry:AddTest("twice", {}, function() end)
+            registry:AddTest("twice", {}, function() end)
+            registry:EndSuite()
+        end)
+        writePlan(FIXTURE_HASH)
+        Assertions.Equals(agent.Prepare(RUN_ID), "error: duplicate test full name: Extra twice", "Prepare")
+        Assertions.Equals(MutationFixture.IsAtLeast, original, "not patched")
+    end)
+
+    DribbleSpec.test("a chunk error during install restores every target installed before it", function()
+        Ext.IO.SaveFile(DIR .. "3.lua", 'error("boom", 0)')
+        writePlan(FIXTURE_HASH, { {
+            index = 3,
+            path = "Shared/DribbleSpec/Tests/Mutation/Fixture.lua",
+            sourceHash = FIXTURE_HASH,
+            patchPath = DIR .. "3.lua",
+            targets = {},
+        } })
+        local loopOriginal = MutationLoopFixture.Approach
+        Assertions.Equals(agent.Prepare(RUN_ID), "error: patch install failed: boom", "Prepare")
+        Assertions.Equals(MutationFixture.IsAtLeast, original, "first target restored")
+        Assertions.Equals(MutationLoopFixture.Approach, loopOriginal, "second target restored")
+    end)
+
+    DribbleSpec.test("a failing baseline test aborts DryRun with its name", function()
+        agent = createAgent(nil, function(registry)
+            registry:BeginSuite("Extra")
+            registry:AddTest("fails", {}, function() error("no", 0) end)
+            registry:EndSuite()
+        end)
+        writePlan(FIXTURE_HASH)
+        agent.Prepare(RUN_ID)
+        Assertions.Equals(agent.DryRun(RUN_ID, { "Extra fails" }), "error: test failed in dry run: Extra fails", "DryRun")
+    end)
+
+    DribbleSpec.test("a failing beforeAll aborts DryRun naming the hook and the selected test", function()
+        agent = createAgent(nil, function(registry)
+            registry:BeginSuite("Extra")
+            registry:AddHook("beforeAll", function() error("no", 0) end)
+            registry:AddTest("after hook", {}, function() end)
+            registry:EndSuite()
+        end)
+        writePlan(FIXTURE_HASH)
+        agent.Prepare(RUN_ID)
+        Assertions.Equals(agent.DryRun(RUN_ID, { "Extra after hook" }),
+            "error: test failed in dry run: Extra [hook] beforeAll (selected: Extra after hook)", "DryRun")
+    end)
+
+    DribbleSpec.test("Checkpoint runs each set together with no active mutant and lists failing tests", function()
+        local dirty = false
+        agent = createAgent(nil, function(registry)
+            registry:BeginSuite("Extra")
+            registry:AddTest("dirties", {}, function() dirty = true end)
+            registry:AddTest("needs clean", {}, function()
+                Assertions.Equals(dirty, false, "dirty")
+            end)
+            registry:EndSuite()
+        end)
+        writePlan(FIXTURE_HASH)
+        agent.Prepare(RUN_ID)
+        Ext.IO.SaveFile(DIR .. "checkpoint.jsonl", "")
+        Assertions.Equals(agent.Checkpoint(RUN_ID, {
+            { set = 4, tests = { ABOVE, "Extra needs clean" } },
+            { set = 5, tests = { "Extra dirties", "Extra needs clean" } },
+        }), "ok", "Checkpoint")
+        local lines = readLines("checkpoint.jsonl")
+        Assertions.Equals(#lines, 2, "checkpoint lines")
+        Assertions.Equals(lines[1].set, 4, "set")
+        Assertions.Equals(lines[1].status, "passed", "clean set")
+        Assertions.Equals(#lines[1].failed, 0, "no failures")
+        Assertions.Equals(lines[2].status, "failed", "order-dependent set")
+        Assertions.Equals(table.concat(lines[2].failed, ","), "Extra needs clean", "failed")
+    end)
+
+    DribbleSpec.test("Checkpoint fails a set with a skipped test", function()
+        writePlan(FIXTURE_HASH)
+        agent.Prepare(RUN_ID)
+        Ext.IO.SaveFile(DIR .. "checkpoint.jsonl", "")
+        Assertions.Equals(agent.Checkpoint(RUN_ID, { { set = 1, tests = { ABOVE, SKIPPED } } }), "ok", "Checkpoint")
+        local line = readLines("checkpoint.jsonl")[1]
+        Assertions.Equals(line.status, "failed", "status")
+        Assertions.Equals(table.concat(line.failed, ","), SKIPPED, "failed")
     end)
 
     DribbleSpec.test("Restore reinstalls the original function", function()
