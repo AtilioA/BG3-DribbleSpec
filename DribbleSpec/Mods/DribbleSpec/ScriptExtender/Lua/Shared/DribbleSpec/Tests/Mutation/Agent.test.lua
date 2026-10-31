@@ -27,6 +27,8 @@ local FAR = "Fixture loop approaches a far target"
 local SKIPPED = "Fixture other is skipped"
 -- Mutant ids in LoopFixture.patch.txt: 6 is `<` to `<=` (ends), 7 is `<` to `>=` (never ends).
 local LOOP_ENDS, LOOP_FOREVER = 6, 7
+-- The agent takes the owner from `Mods[plan.modTable].ModuleUUID`.
+local OWNED = { ownerModuleUUID = ModuleUUID }
 
 ---@param sourceHash string
 ---@param extraFiles table[]|nil plan file entries appended after the fixtures
@@ -36,23 +38,18 @@ local function writePlan(sourceHash, extraFiles)
     Ext.IO.SaveFile(DIR .. "coverage.jsonl", "")
     Ext.IO.SaveFile(DIR .. "results.jsonl", "")
     Ext.IO.SaveFile(DIR .. "plan.json", Ext.Json.Stringify({
-        schemaVersion = 1,
         runId = RUN_ID,
-        ownerModuleUUID = "",
         modTable = "Dribbles",
-        modDirectory = "DribbleSpec",
         testFilter = { name = "Fixture " },
         files = { {
             index = 1,
             path = "Shared/DribbleSpec/Tests/Mutation/Fixture.lua",
             sourceHash = sourceHash,
-            patchPath = PATCH,
             targets = { "MutationFixture.IsAtLeast" },
         }, {
             index = 2,
             path = "Shared/DribbleSpec/Tests/Mutation/LoopFixture.lua",
             sourceHash = LOOP_FIXTURE_HASH,
-            patchPath = LOOP_PATCH,
             targets = { "MutationLoopFixture.Approach" },
         }, table.unpack(extraFiles or {}) },
         mutants = {},
@@ -64,7 +61,7 @@ end
 ---@return MutationAgent
 local function createAgent(clock, extra)
     local registry = Registry.Create()
-    registry:BeginSuite("Fixture")
+    registry:BeginSuite("Fixture", OWNED)
     registry:BeginSuite("IsAtLeast")
     registry:AddTest("is true above the minimum", {}, function()
         Assertions.Equals(MutationFixture.IsAtLeast(5, 1), true, "IsAtLeast(5, 1)")
@@ -141,6 +138,18 @@ DribbleSpec.describe("DribbleSpec Mutation agent", { tags = { "mutation" } }, fu
             Ext.Json.Stringify({ ABOVE, OTHER, SKIPPED, SKIPS, HOOK_TEST, LOOP, SWALLOW, FAR }, { Beautify = false }), "tests.json")
     end)
 
+    DribbleSpec.test("Prepare selects only tests owned by the plan's mod", function()
+        agent = createAgent(nil, function(registry)
+            registry:BeginSuite("Fixture", { ownerModuleUUID = "other-mod" })
+            registry:AddTest("foreign", {}, function() end)
+            registry:EndSuite()
+        end)
+        writePlan(FIXTURE_HASH)
+        Assertions.Equals(agent.Prepare(RUN_ID), "ok", "Prepare")
+        Assertions.Equals(Ext.IO.LoadFile(DIR .. "tests.json"),
+            Ext.Json.Stringify({ ABOVE, OTHER, SKIPPED, SKIPS, HOOK_TEST, LOOP, SWALLOW, FAR }, { Beautify = false }), "tests.json")
+    end)
+
     DribbleSpec.test("DryRun records hits only for the test that calls the target", function()
         writePlan(FIXTURE_HASH)
         agent.Prepare(RUN_ID)
@@ -179,7 +188,7 @@ DribbleSpec.describe("DribbleSpec Mutation agent", { tags = { "mutation" } }, fu
     DribbleSpec.test("a Prepare that cannot write tests.json leaves nothing installed", function()
         writePlan(FIXTURE_HASH)
         local blockedDir = "DribbleSpecMutation/selftest-blocked/"
-        for _, name in ipairs({ "plan.json", "1.lua" }) do
+        for _, name in ipairs({ "plan.json", "1.lua", "2.lua" }) do
             Ext.IO.SaveFile(blockedDir .. name, Ext.IO.LoadFile(DIR .. name))
         end
         Ext.IO.SaveFile(blockedDir .. "plan.json",
@@ -285,7 +294,7 @@ DribbleSpec.describe("DribbleSpec Mutation agent", { tags = { "mutation" } }, fu
 
     DribbleSpec.test("duplicate full names anywhere in the owner's registry stop Prepare", function()
         agent = createAgent(nil, function(registry)
-            registry:BeginSuite("Extra")
+            registry:BeginSuite("Extra", OWNED)
             registry:AddTest("twice", {}, function() end)
             registry:AddTest("twice", {}, function() end)
             registry:EndSuite()
@@ -301,7 +310,6 @@ DribbleSpec.describe("DribbleSpec Mutation agent", { tags = { "mutation" } }, fu
             index = 3,
             path = "Shared/DribbleSpec/Tests/Mutation/Fixture.lua",
             sourceHash = FIXTURE_HASH,
-            patchPath = DIR .. "3.lua",
             targets = {},
         } })
         local loopOriginal = MutationLoopFixture.Approach
@@ -312,7 +320,7 @@ DribbleSpec.describe("DribbleSpec Mutation agent", { tags = { "mutation" } }, fu
 
     DribbleSpec.test("a failing baseline test aborts DryRun with its name", function()
         agent = createAgent(nil, function(registry)
-            registry:BeginSuite("Extra")
+            registry:BeginSuite("Extra", OWNED)
             registry:AddTest("fails", {}, function() error("no", 0) end)
             registry:EndSuite()
         end)
@@ -323,7 +331,7 @@ DribbleSpec.describe("DribbleSpec Mutation agent", { tags = { "mutation" } }, fu
 
     DribbleSpec.test("a failing beforeAll aborts DryRun naming the hook and the selected test", function()
         agent = createAgent(nil, function(registry)
-            registry:BeginSuite("Extra")
+            registry:BeginSuite("Extra", OWNED)
             registry:AddHook("beforeAll", function() error("no", 0) end)
             registry:AddTest("after hook", {}, function() end)
             registry:EndSuite()
@@ -337,7 +345,7 @@ DribbleSpec.describe("DribbleSpec Mutation agent", { tags = { "mutation" } }, fu
     DribbleSpec.test("Checkpoint runs each set together with no active mutant and lists failing tests", function()
         local dirty = false
         agent = createAgent(nil, function(registry)
-            registry:BeginSuite("Extra")
+            registry:BeginSuite("Extra", OWNED)
             registry:AddTest("dirties", {}, function() dirty = true end)
             registry:AddTest("needs clean", {}, function()
                 Assertions.Equals(dirty, false, "dirty")

@@ -145,9 +145,10 @@ class ConsoleAgent:
             error = f"{response.error.code}: {response.error.message}" if response.error else response.outcome
             raise AgentError(f"server reset failed: {error}")
         deadline = time.monotonic() + RESET_WAIT_S
-        # Remove this check when the debugger reports mod load completion.
+        # Waits for BG3SE's ResetCompleted (after all mods load); the debugger reports `loaded` earlier.
         while True:
-            probe = self._run("eval", self._session.eval("server", "Mods.Dribbles ~= nil and Mods.Dribbles.Mutation ~= nil", 5))
+            probe = self._run("eval", self._session.eval(
+                "server", "Mods.Dribbles ~= nil and Mods.Dribbles.Mutation ~= nil and Mods.Dribbles.Mutation.ResetCompleted == true", 5))
             if probe.outcome == "succeeded" and probe.result == "true":
                 return
             if time.monotonic() >= deadline:

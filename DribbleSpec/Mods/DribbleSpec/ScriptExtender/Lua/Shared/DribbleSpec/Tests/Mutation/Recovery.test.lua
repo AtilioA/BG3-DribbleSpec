@@ -8,7 +8,7 @@ Ext.Require("Shared/DribbleSpec/Tests/Mutation/DirtyVictimFixture.lua")
 -- The owner lets a mutation config select this suite alone (tools/mutation/recovery.config.json).
 DribbleSpec.describe("DribbleSpec Mutation recovery fixture", {
     tags = { "mutation" },
-    ownerModuleUUID = "95d8af72-eff9-40dc-9f9f-02effe3114fc",
+    ownerModuleUUID = ModuleUUID,
 }, function()
     DribbleSpec.test("Close closes the latch", function()
         Assertions.Equals(MutationDirtyFixture.open, false, "open before")

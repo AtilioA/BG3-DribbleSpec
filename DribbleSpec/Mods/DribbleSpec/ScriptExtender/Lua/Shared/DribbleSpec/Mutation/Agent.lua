@@ -77,16 +77,17 @@ end
 
 --- Duplicates are checked over every test of the owner, since `testIds` can select any of them.
 ---@param registry DribbleSpecRegistry
----@param plan table
+---@param testFilter table|nil
+---@param owner string
 ---@return string[]
-local function resolveTests(registry, plan)
-    local testFilter = plan.testFilter or {}
+local function resolveTests(registry, testFilter, owner)
+    testFilter = testFilter or {}
     local filter = Filter.Create({
         tags = testFilter.tags,
         namePattern = testFilter.name,
-        ownerModuleUUID = plan.ownerModuleUUID,
+        ownerModuleUUID = owner,
     })
-    local owned = Filter.Create({ ownerModuleUUID = plan.ownerModuleUUID })
+    local owned = Filter.Create({ ownerModuleUUID = owner })
     local ids, seen = {}, {}
     local function walk(suite, lineage)
         table.insert(lineage, suite)
@@ -142,14 +143,14 @@ function Agent.Create(deps)
     local agent = { Runtime = Runtime }
     ---@type { parent: table, key: string, fn: function }[]|nil
     local originals = nil
-    ---@type table|nil
-    local plan = nil
+    ---@type string|nil ModuleUUID of the prepared plan's mod; nil when no run is prepared
+    local owner = nil
     local clock = deps.clock or Ext.Timer.MonotonicTime
     ---@type table<string, integer> steps per passed test in this agent's dry runs
     local dryRunSteps = {}
 
     local function runOptions(testIds)
-        return { ownerModuleUUID = plan.ownerModuleUUID, testIds = testIds }
+        return { ownerModuleUUID = owner, testIds = testIds }
     end
 
     local function restore()
@@ -185,9 +186,11 @@ function Agent.Create(deps)
             if type(env) ~= "table" then
                 error("mod table not loaded: " .. tostring(p.modTable), 0)
             end
+            local modOwner = env.ModuleUUID
+            local directory = Ext.Mod.GetMod(modOwner).Info.Directory
             local chunks, targets = {}, {}
             for _, file in ipairs(p.files) do
-                local sourcePath = string.format("Mods/%s/ScriptExtender/Lua/%s", p.modDirectory, file.path)
+                local sourcePath = string.format("Mods/%s/ScriptExtender/Lua/%s", directory, file.path)
                 local source = Ext.IO.LoadFile(sourcePath, "data")
                 if source == nil then
                     error("cannot read deployed source " .. sourcePath, 0)
@@ -195,13 +198,14 @@ function Agent.Create(deps)
                 if fnv1a32(source) ~= file.sourceHash then
                     error("deployed source differs from repo: " .. file.path, 0)
                 end
-                local text = Ext.IO.LoadFile(file.patchPath)
+                local patchPath = runPath(runId, file.index .. ".lua")
+                local text = Ext.IO.LoadFile(patchPath)
                 if text == nil then
-                    error("cannot read patch " .. file.patchPath, 0)
+                    error("cannot read patch " .. patchPath, 0)
                 end
                 local chunk, compileError = load(text, env)
                 if chunk == nil then
-                    error(string.format("patch %s does not compile: %s", file.patchPath, tostring(compileError)), 0)
+                    error(string.format("patch %s does not compile: %s", patchPath, tostring(compileError)), 0)
                 end
                 table.insert(chunks, chunk)
                 for _, target in ipairs(file.targets) do
@@ -209,7 +213,7 @@ function Agent.Create(deps)
                     table.insert(targets, { parent = parent, key = key, fn = parent[key] })
                 end
             end
-            local testIds = resolveTests(deps.registry, p)
+            local testIds = resolveTests(deps.registry, p.testFilter, modOwner)
             if not Ext.IO.SaveFile(runPath(runId, "tests.json"), Ext.Json.Stringify(testIds, { Beautify = false })) then
                 error("cannot write " .. runPath(runId, "tests.json"), 0)
             end
@@ -223,7 +227,7 @@ function Agent.Create(deps)
                 end
             end
             loadDryRunSteps(runId)
-            plan = p
+            owner = modOwner
         end)
     end
 
@@ -232,7 +236,7 @@ function Agent.Create(deps)
     ---@return string
     function agent.DryRun(runId, testIds)
         return guarded(function()
-            if plan == nil then
+            if owner == nil then
                 error("no prepared run; call Prepare first", 0)
             end
             local ok, err = xpcall(function()
@@ -285,7 +289,7 @@ function Agent.Create(deps)
     ---@return string
     function agent.Checkpoint(runId, sets)
         return guarded(function()
-            if plan == nil then
+            if owner == nil then
                 error("no prepared run; call Prepare first", 0)
             end
             Runtime.a = 0
@@ -317,7 +321,7 @@ function Agent.Create(deps)
     ---@return string
     function agent.RunMutant(runId, mutantId, testIds, attempt)
         return guarded(function()
-            if plan == nil then
+            if owner == nil then
                 error("no prepared run; call Prepare first", 0)
             end
             local result = { mutantId = mutantId, killedBy = {}, passed = 0, failed = 0, skipped = 0, attempt = attempt }
@@ -372,7 +376,7 @@ function Agent.Create(deps)
     function agent.Restore(_runId)
         return guarded(function()
             restore()
-            plan = nil
+            owner = nil
         end)
     end
 

@@ -8,7 +8,7 @@ from dribblespec_mutate.run import (MAX_EXPRESSION, AgentError, ConsoleAgent, Ev
 
 PLAN = {
     "runId": "r1", "testFilter": {"tags": ["validators"]},
-    "files": [{"index": 1, "path": "F.lua", "patchPath": "DribbleSpecMutation/r1/1.lua"}],
+    "files": [{"index": 1, "path": "F.lua"}],
     "mutants": [
         {"id": 1, "file": 1, "line": 3, "operator": "RelationalBoundary", "original": "<", "replacement": "<="},
         {"id": 2, "file": 1, "line": 3, "operator": "RelationalBoundary", "original": "<", "replacement": ">="},
@@ -310,7 +310,7 @@ def test_a_line_written_before_the_send_does_not_end_the_wait(tmp_path, no_sleep
         run_plan(PLAN, {}, tmp_path, Stale(tmp_path, line_at=None))
 
 
-TWO_FILES = {**PLAN, "files": PLAN["files"] + [{"index": 2, "path": "G.lua", "patchPath": "DribbleSpecMutation/r1/2.lua"}],
+TWO_FILES = {**PLAN, "files": PLAN["files"] + [{"index": 2, "path": "G.lua"}],
              "mutants": [{**m, "file": 1 if m["id"] <= 2 else 2} for m in PLAN["mutants"][:3]]
              + [{"id": 4, "file": 2, "line": 12, "operator": "RelationalBoundary", "original": ">", "replacement": "<="}]}
 

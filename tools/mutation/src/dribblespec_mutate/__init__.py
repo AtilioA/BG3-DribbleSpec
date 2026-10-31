@@ -3,7 +3,7 @@
 import argparse
 import json
 import sys
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
@@ -14,13 +14,14 @@ class ConfigError(Exception):
     pass
 
 
+CUT_KEYS = ("modTable", "modDirectory", "ownerModuleUUID", "luaRoot")
+
+
 @dataclass
 class Config:
     dir: Path
     modTable: str
-    modDirectory: str
-    ownerModuleUUID: str
-    luaRoot: str
+    lua_root: Path
     files: list[str]
     testFilter: dict
     ignoreCalls: list[str]
@@ -28,9 +29,25 @@ class Config:
 
 def load_config(path: Path) -> Config:
     data = json.loads(path.read_text(encoding="utf-8"))
-    for key in ("modTable", "modDirectory", "ownerModuleUUID", "luaRoot"):
-        if not isinstance(data.get(key), str) or not data[key]:
-            raise ConfigError(f"{path}: '{key}' must be a non-empty string")
+    for key in CUT_KEYS:
+        if key in data:
+            raise ConfigError(f"{path}: '{key}' is no longer supported; set 'mod' to the Mods/<Folder> directory "
+                              "(relative to the config) and remove 'modTable', 'modDirectory', 'ownerModuleUUID', 'luaRoot'")
+    if not isinstance(data.get("mod"), str) or not data["mod"]:
+        raise ConfigError(f"{path}: 'mod' must be a non-empty path to the Mods/<Folder> directory")
+    mod = (path.parent / data["mod"]).resolve()
+    se_config = mod / "ScriptExtender" / "Config.json"
+    if not se_config.is_file():
+        raise ConfigError(f"{path}: {se_config} not found; 'mod' must point at the Mods/<Folder> directory")
+    try:
+        se_data = json.loads(se_config.read_text(encoding="utf-8-sig"))
+    except json.JSONDecodeError as e:
+        raise ConfigError(f"{se_config}: not valid JSON: {e}") from None
+    if not isinstance(se_data, dict):
+        raise ConfigError(f"{se_config}: must be a JSON object")
+    mod_table = se_data.get("ModTable")
+    if not isinstance(mod_table, str) or not mod_table:
+        raise ConfigError(f"{se_config}: 'ModTable' must be a non-empty string")
     files = data.get("files")
     if not isinstance(files, list) or not files or not all(isinstance(f, str) for f in files):
         raise ConfigError(f"{path}: 'files' must be a non-empty list of globs")
@@ -40,8 +57,7 @@ def load_config(path: Path) -> Config:
     ignore_calls = data.get("ignoreCalls", [])
     if not isinstance(ignore_calls, list) or not all(isinstance(c, str) for c in ignore_calls):
         raise ConfigError(f"{path}: 'ignoreCalls' must be a list of strings")
-    return Config(path.parent, data["modTable"], data["modDirectory"], data["ownerModuleUUID"],
-                  data["luaRoot"], files, test_filter, ignore_calls)
+    return Config(path.parent, mod_table, mod / "ScriptExtender" / "Lua", files, test_filter, ignore_calls)
 
 
 def fnv1a32(data: bytes) -> str:
@@ -53,8 +69,8 @@ def fnv1a32(data: bytes) -> str:
 
 
 def build_plan(config: Config, run_id: str) -> tuple[dict, dict[str, str]]:
-    """Return the plan and the patch chunks keyed by patchPath."""
-    lua_root = (config.dir / config.luaRoot).resolve()
+    """Return the plan and the patch chunks keyed by `DribbleSpecMutation/<runId>/<index>.lua`."""
+    lua_root = config.lua_root
     paths = sorted({p.relative_to(lua_root).as_posix() for g in config.files for p in lua_root.glob(g) if p.is_file()})
     if not paths:
         raise ConfigError(f"no files match {config.files} under {lua_root}")
@@ -65,18 +81,16 @@ def build_plan(config: Config, run_id: str) -> tuple[dict, dict[str, str]]:
             result = instrument(source, first_id=len(mutants) + 1, ignore_calls=config.ignoreCalls)
         except SourceError as e:
             raise SourceError(f"{rel}: {e}") from None
-        patch_path = f"DribbleSpecMutation/{run_id}/{index}.lua"
-        chunks[patch_path] = result.chunk
-        files.append({"index": index, "path": rel, "sourceHash": fnv1a32(source),
-                      "patchPath": patch_path, "targets": result.targets})
+        chunks[f"DribbleSpecMutation/{run_id}/{index}.lua"] = result.chunk
+        files.append({"index": index, "path": rel, "sourceHash": fnv1a32(source), "targets": result.targets})
         for m in result.mutants:
-            record = {"file": index, **asdict(m)}
-            if record["ignoredReason"] is None:
-                del record["ignoredReason"]
+            record = {"file": index, "id": m.id, "operator": m.operator, "original": m.original,
+                      "replacement": m.replacement, "line": m.line}
+            if m.ignoredReason is not None:
+                record["ignoredReason"] = m.ignoredReason
             mutants.append(record)
-    plan = {"schemaVersion": 1, "runId": run_id, "ownerModuleUUID": config.ownerModuleUUID,
-            "modTable": config.modTable, "modDirectory": config.modDirectory,
-            "testFilter": config.testFilter, "files": files, "mutants": mutants}
+    plan = {"runId": run_id, "modTable": config.modTable, "testFilter": config.testFilter,
+            "files": files, "mutants": mutants}
     return plan, chunks
 
 
