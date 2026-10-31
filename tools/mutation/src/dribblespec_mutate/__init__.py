@@ -101,6 +101,10 @@ def cmd_list(args) -> int:
     plan_file.write_text(json.dumps(plan, indent=2), encoding="utf-8")
     for m in plan["mutants"]:
         print(format_mutant(plan, m))
+    for f in plan["files"]:
+        own = [m for m in plan["mutants"] if m["file"] == f["index"]]
+        if own:
+            print(f"{f['path']}: {sum('ignoredReason' in m for m in own)} of {len(own)} ignored")
     ignored = sum("ignoredReason" in m for m in plan["mutants"])
     print(f"{len(plan['mutants'])} mutants ({ignored} ignored) in {len(plan['files'])} files; plan: {plan_file}")
     return 0

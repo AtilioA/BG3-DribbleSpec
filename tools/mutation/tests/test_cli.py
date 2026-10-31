@@ -4,6 +4,7 @@ from pathlib import Path
 import pytest
 
 from dribblespec_mutate import fnv1a32, main
+from test_instrument import _call, mutate_text
 
 
 def test_source_hash_is_fnv1a32_and_ignores_crlf():
@@ -77,6 +78,29 @@ def test_list_on_mcm_validators_includes_spike_mutants(tmp_path, capsys, lua):
         chunk = (tmp_path / f["patchPath"]).read_bytes().decode()
         assert (chunk.count("\n"), chunk.count("\r")) == (source.count("\n"), source.count("\r")), f["path"]
         lua.compile(chunk, "=" + f["path"])
+    assert "Shared/Helpers/Validators/ColorValidator.lua: 0 of 4 ignored\n" in out
+    _check_color_validator(plan, lua_root, tmp_path)
+
+
+def _check_color_validator(plan, lua_root, out_dir):
+    from conftest import Lua
+
+    (f,) = [f for f in plan["files"] if f["path"].endswith("ColorValidator.lua")]
+    source = (lua_root / f["path"]).read_bytes().decode()
+    chunk = (out_dir / f["patchPath"]).read_bytes().decode()
+    mutants = [m for m in plan["mutants"] if m["file"] == f["index"]]
+    stub = "_Class = { Create = function() return {} end }; Validator = {}\n"
+    inputs = ["{0, 1, 0.5, 1}", "{1, 1, 1, 1.0001}", "{-0, 0, 0, 0}", "{0, 0, 0}", '"x"']
+    for m in [None] + mutants:
+        oracle, subject = Lua(), Lua()
+        text = mutate_text(source, type("M", (), m)) if m else source
+        oracle.run(stub); oracle.run(text)
+        subject.run(stub); subject.run(source); subject.run(chunk)
+        subject.runtime.a = m["id"] if m else 0
+        for arg in inputs:
+            got = _call(subject, "ColorValidator.Validate", None, subject.eval(arg))
+            want = _call(oracle, "ColorValidator.Validate", None, oracle.eval(arg))
+            assert got == want, (m, arg)
 
 
 def test_list_fails_with_file_name_on_non_utf8_source(tmp_path, capsys):
