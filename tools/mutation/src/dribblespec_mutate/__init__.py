@@ -85,14 +85,30 @@ def format_mutant(plan: dict, m: dict) -> str:
     return line + (f"  [Ignored: {m['ignoredReason']}]" if "ignoredReason" in m else "")
 
 
+def ignored_per_file(plan: dict) -> list[str]:
+    """One `path: n of m ignored` line per file that has mutants."""
+    lines = []
+    for f in plan["files"]:
+        own = [m for m in plan["mutants"] if m["file"] == f["index"]]
+        if own:
+            lines.append(f"{f['path']}: {sum('ignoredReason' in m for m in own)} of {len(own)} ignored")
+    return lines
+
+
+def next_run_id(root: Path) -> str:
+    """A `YYYYMMDD-HHMMSS` run id, suffixed `-2`, `-3`, ... while that run directory exists under `root`."""
+    base = run_id = datetime.now().strftime("%Y%m%d-%H%M%S")
+    suffix = 1
+    while (root / "DribbleSpecMutation" / run_id).exists():
+        suffix += 1
+        run_id = f"{base}-{suffix}"
+    return run_id
+
+
 def cmd_list(args) -> int:
     config = load_config(Path(args.config))
     out = Path(args.out) if args.out else config.dir / ".dribblespec-mutation"
-    base_id = run_id = datetime.now().strftime("%Y%m%d-%H%M%S")
-    suffix = 1
-    while (out / "DribbleSpecMutation" / run_id).exists():
-        suffix += 1
-        run_id = f"{base_id}-{suffix}"
+    run_id = next_run_id(out)
     plan, chunks = build_plan(config, run_id)
     (out / "DribbleSpecMutation" / run_id).mkdir(parents=True)
     for patch_path, chunk in chunks.items():
@@ -101,10 +117,8 @@ def cmd_list(args) -> int:
     plan_file.write_text(json.dumps(plan, indent=2), encoding="utf-8")
     for m in plan["mutants"]:
         print(format_mutant(plan, m))
-    for f in plan["files"]:
-        own = [m for m in plan["mutants"] if m["file"] == f["index"]]
-        if own:
-            print(f"{f['path']}: {sum('ignoredReason' in m for m in own)} of {len(own)} ignored")
+    for line in ignored_per_file(plan):
+        print(line)
     ignored = sum("ignoredReason" in m for m in plan["mutants"])
     print(f"{len(plan['mutants'])} mutants ({ignored} ignored) in {len(plan['files'])} files; plan: {plan_file}")
     return 0
@@ -117,6 +131,11 @@ def main(argv: list[str] | None = None) -> int:
     p_list.add_argument("--config", required=True, help="path to the mutation config JSON")
     p_list.add_argument("--out", help="work directory (default: .dribblespec-mutation/ next to the config)")
     p_list.set_defaults(func=cmd_list)
+    from .run import cmd_run
+
+    p_run = sub.add_parser("run", help="run the mutants in the game and print the summary")
+    p_run.add_argument("--config", required=True, help="path to the mutation config JSON")
+    p_run.set_defaults(func=cmd_run)
     args = parser.parse_args(argv)
     try:
         return args.func(args)

@@ -1,0 +1,310 @@
+-- Mutation agent (`Mods.Dribbles.Mutation`): installs host patch chunks and runs tests per mutant.
+-- Each call returns "ok" or "error: <message>" and writes its data under `DribbleSpecMutation/<runId>/`.
+local Runtime = Ext.Require("Shared/DribbleSpec/Mutation/Runtime.lua")
+local Filter = Ext.Require("Shared/DribbleSpec/Runner/Filter.lua")
+
+---@class MutationAgentDeps
+---@field registry DribbleSpecRegistry tests to resolve the plan's testFilter against
+---@field run fun(options: table): table runs tests and returns a DribbleSpec run result
+
+---@class MutationAgent
+---@field Runtime MutationRuntime
+local Agent = {}
+
+---@param data string
+---@return string
+local function fnv1a32(data)
+    local h = 2166136261
+    data = data:gsub("\r\n", "\n")
+    for i = 1, #data do
+        h = ((h ~ data:byte(i)) * 16777619) & 0xFFFFFFFF
+    end
+    return string.format("%08x", h)
+end
+
+---@param runId string
+---@param name string
+---@return string
+local function runPath(runId, name)
+    return string.format("DribbleSpecMutation/%s/%s", runId, name)
+end
+
+---@param path string
+---@param value table
+local function appendLine(path, value)
+    if not Ext.IO.AppendFile(path, Ext.Json.Stringify(value, { Beautify = false }) .. "\n") then
+        error("cannot write " .. path, 0)
+    end
+end
+
+---@param runId string
+---@return table
+local function loadPlan(runId)
+    local text = Ext.IO.LoadFile(runPath(runId, "plan.json"))
+    if text == nil then
+        error("cannot read " .. runPath(runId, "plan.json"), 0)
+    end
+    return Ext.Json.Parse(text)
+end
+
+---@param env table
+---@param target string dotted path such as "A.B"
+---@return table parent, string key
+local function resolveTarget(env, target)
+    local parent = env
+    local keys = {}
+    for key in target:gmatch("[^.]+") do
+        table.insert(keys, key)
+    end
+    for i = 1, #keys - 1 do
+        parent = parent[keys[i]]
+        if type(parent) ~= "table" then
+            error(string.format("target %s: %s is not a table", target, keys[i]), 0)
+        end
+    end
+    local key = keys[#keys]
+    if type(parent[key]) ~= "function" then
+        error(string.format("target %s is not a function", target), 0)
+    end
+    return parent, key
+end
+
+---@param registry DribbleSpecRegistry
+---@param plan table
+---@return string[]
+local function resolveTests(registry, plan)
+    local testFilter = plan.testFilter or {}
+    local filter = Filter.Create({
+        tags = testFilter.tags,
+        namePattern = testFilter.name,
+        ownerModuleUUID = plan.ownerModuleUUID,
+    })
+    local ids, seen = {}, {}
+    local function walk(suite, lineage)
+        table.insert(lineage, suite)
+        for _, test in ipairs(suite.tests) do
+            if filter.ShouldIncludeTest(lineage, test) then
+                if seen[test.fullName] then
+                    error("duplicate test full name: " .. test.fullName, 0)
+                end
+                seen[test.fullName] = true
+                table.insert(ids, test.fullName)
+            end
+        end
+        for _, child in ipairs(suite.suites) do
+            walk(child, lineage)
+        end
+        table.remove(lineage)
+    end
+    for _, suite in ipairs(registry:Snapshot().suites) do
+        walk(suite, {})
+    end
+    return ids
+end
+
+---@param suites table[]
+---@param visit fun(test: table)
+local function eachResult(suites, visit)
+    for _, suite in ipairs(suites or {}) do
+        for _, test in ipairs(suite.tests or {}) do
+            visit(test)
+        end
+        eachResult(suite.suites, visit)
+    end
+end
+
+---@param fn function
+---@return string
+local function guarded(fn)
+    local ok, err = xpcall(fn, function(e)
+        return tostring(e)
+    end)
+    if ok then
+        return "ok"
+    end
+    -- The console transport breaks on non-ASCII result bytes.
+    return "error: " .. err:gsub("[\128-\255]", function(c) return "\\" .. c:byte() end)
+end
+
+---@param deps MutationAgentDeps
+---@return MutationAgent
+function Agent.Create(deps)
+    local agent = { Runtime = Runtime }
+    ---@type { parent: table, key: string, fn: function }[]|nil
+    local originals = nil
+    ---@type table|nil
+    local plan = nil
+
+    local function runOptions(testIds)
+        return { ownerModuleUUID = plan.ownerModuleUUID, testIds = testIds }
+    end
+
+    local function restore()
+        for i = #(originals or {}), 1, -1 do
+            local o = originals[i]
+            o.parent[o.key] = o.fn
+        end
+        originals = nil
+    end
+
+    ---@param runId string
+    ---@return string
+    function agent.Prepare(runId)
+        return guarded(function()
+            if originals ~= nil then
+                error("patches are active; call Restore first", 0)
+            end
+            local p = loadPlan(runId)
+            local env = Mods[p.modTable]
+            if type(env) ~= "table" then
+                error("mod table not loaded: " .. tostring(p.modTable), 0)
+            end
+            local chunks, targets = {}, {}
+            for _, file in ipairs(p.files) do
+                local sourcePath = string.format("Mods/%s/ScriptExtender/Lua/%s", p.modDirectory, file.path)
+                local source = Ext.IO.LoadFile(sourcePath, "data")
+                if source == nil then
+                    error("cannot read deployed source " .. sourcePath, 0)
+                end
+                if fnv1a32(source) ~= file.sourceHash then
+                    error("deployed source differs from repo: " .. file.path, 0)
+                end
+                local text = Ext.IO.LoadFile(file.patchPath)
+                if text == nil then
+                    error("cannot read patch " .. file.patchPath, 0)
+                end
+                local chunk, compileError = load(text, env)
+                if chunk == nil then
+                    error(string.format("patch %s does not compile: %s", file.patchPath, tostring(compileError)), 0)
+                end
+                table.insert(chunks, chunk)
+                for _, target in ipairs(file.targets) do
+                    local parent, key = resolveTarget(env, target)
+                    table.insert(targets, { parent = parent, key = key, fn = parent[key] })
+                end
+            end
+            local testIds = resolveTests(deps.registry, p)
+            if not Ext.IO.SaveFile(runPath(runId, "tests.json"), Ext.Json.Stringify(testIds, { Beautify = false })) then
+                error("cannot write " .. runPath(runId, "tests.json"), 0)
+            end
+
+            originals = targets
+            for _, chunk in ipairs(chunks) do
+                local ok, err = pcall(chunk)
+                if not ok then
+                    restore()
+                    error("patch install failed: " .. tostring(err), 0)
+                end
+            end
+            plan = p
+        end)
+    end
+
+    ---@param runId string
+    ---@param testIds string[]
+    ---@return string
+    function agent.DryRun(runId, testIds)
+        return guarded(function()
+            if plan == nil then
+                error("no prepared run; call Prepare first", 0)
+            end
+            local kept = 0
+            local ok, err = xpcall(function()
+                Runtime.a = 0
+                for _, id in ipairs(testIds) do
+                    Runtime.hits, Runtime.steps = {}, 0
+                    local started = Ext.Timer.MonotonicTime()
+                    local run = deps.run(runOptions({ id }))
+                    local result
+                    eachResult(run.suites, function(test)
+                        if test.fullName == id then result = test end
+                    end)
+                    if result == nil then
+                        error("test not run: " .. id, 0)
+                    end
+                    local status = result.status
+                    if status == "failed" or (run.summary.failed or 0) > 0 then
+                        error("test failed in dry run: " .. id, 0)
+                    end
+                    if status == "passed" then
+                        kept = kept + 1
+                        local hits = {}
+                        for hit in pairs(Runtime.hits) do
+                            table.insert(hits, hit)
+                        end
+                        table.sort(hits)
+                        appendLine(runPath(runId, "coverage.jsonl"), {
+                            test = id,
+                            status = status,
+                            durationMs = Ext.Timer.MonotonicTime() - started,
+                            steps = Runtime.steps,
+                            hits = hits,
+                        })
+                    end
+                end
+            end, function(e) return tostring(e) end)
+            Runtime.hits, Runtime.steps = nil, 0
+            if not ok then
+                error(err, 0)
+            end
+            if kept == 0 then
+                error("no test left after dropping skipped tests", 0)
+            end
+        end)
+    end
+
+    ---@param runId string
+    ---@param mutantId integer
+    ---@param testIds string[]
+    ---@return string
+    function agent.RunMutant(runId, mutantId, testIds)
+        return guarded(function()
+            if plan == nil then
+                error("no prepared run; call Prepare first", 0)
+            end
+            local result = { mutantId = mutantId, killedBy = {}, passed = 0, failed = 0, skipped = 0, attempt = 1 }
+            local started = Ext.Timer.MonotonicTime()
+            Runtime.a = mutantId
+            local ok, run = xpcall(deps.run, function(e) return tostring(e) end, runOptions(testIds))
+            Runtime.a, Runtime.steps, Runtime.limitHit = 0, 0, nil
+            result.durationMs = Ext.Timer.MonotonicTime() - started
+
+            if not ok then
+                result.status, result.message = "RuntimeError", run:match("[^\n]*")
+            else
+                eachResult(run.suites, function(test)
+                    result[test.status] = (result[test.status] or 0) + 1
+                    if test.status == "failed" then
+                        table.insert(result.killedBy, test.fullName)
+                        if result.message == nil and test.error ~= nil then
+                            result.message = tostring(test.error.message):match("[^\n]*")
+                        end
+                    end
+                end)
+                if result.failed > 0 then
+                    result.status = "Killed"
+                elseif result.passed == #testIds and result.skipped == 0 then
+                    result.status = "Survived"
+                else
+                    result.status = "RuntimeError"
+                    result.message = string.format("%d of %d tests passed, %d skipped", result.passed, #testIds,
+                        result.skipped)
+                end
+            end
+            appendLine(runPath(runId, "results.jsonl"), result)
+        end)
+    end
+
+    ---@param _runId string
+    ---@return string
+    function agent.Restore(_runId)
+        return guarded(function()
+            restore()
+            plan = nil
+        end)
+    end
+
+    return agent
+end
+
+return Agent

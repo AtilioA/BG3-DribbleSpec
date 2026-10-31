@@ -1,0 +1,6 @@
+local __M = Mods.Dribbles.Mutation.Runtime; -- Fixture target for the mutation agent self-tests. Agent.test.lua pins this file's hash.
+                    
+
+function MutationFixture.IsAtLeast(value, min) __M.S();
+    return __M.Cmp(1, ">=", (value), (min))
+end
